@@ -307,7 +307,7 @@ class ProjectState(rx.State):
         }
 
     @rx.var
-    def project_list(self) -> list[ProjectType]:
+    def filtered_project_list(self) -> list[ProjectType]:
         with rx.session() as session:
             query = sqlalchemy.select(DBProject)
             if self.filter_status != "todos":
@@ -333,6 +333,21 @@ class ProjectState(rx.State):
                         f"%{self.filter_responsible}%"
                     )
                 )
+            if self.search_term.strip():
+                search_lower = self.search_term.lower()
+                query = query.where(
+                    sqlalchemy.or_(
+                        DBProject.name.ilike(
+                            f"%{search_lower}%"
+                        ),
+                        DBProject.responsible.ilike(
+                            f"%{search_lower}%"
+                        ),
+                        DBProject.description.ilike(
+                            f"%{search_lower}%"
+                        ),
+                    )
+                )
             db_projects = (
                 session.exec(query.order_by(DBProject.name))
                 .scalars()
@@ -342,21 +357,6 @@ class ProjectState(rx.State):
                 self._map_dbproject_to_projecttype(p)
                 for p in db_projects
             ]
-
-    @rx.var
-    def filtered_project_list(self) -> list[ProjectType]:
-        projects_from_db = self.project_list
-        if not self.search_term.strip():
-            return projects_from_db
-        search_lower = self.search_term.lower()
-        return [
-            p
-            for p in projects_from_db
-            if search_lower in p["name"].lower()
-            or search_lower in p["responsible"].lower()
-            or search_lower
-            in p.get("description", "").lower()
-        ]
 
     @rx.var
     def selected_project(self) -> ProjectType | None:
