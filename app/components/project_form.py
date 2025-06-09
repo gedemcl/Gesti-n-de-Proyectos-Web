@@ -175,7 +175,45 @@ def project_form() -> rx.Component:
                             class_name="w-full p-2 mt-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500",
                             required=True,
                         ),
-                        class_name="w-full px-2 mb-4",
+                        class_name="w-full md:w-1/2 px-2 mb-4",
+                    ),
+                    rx.el.div(
+                        rx.el.label(
+                            "Temática / Categoría del Proyecto",
+                            html_for="category_id",
+                            class_name="text-sm font-medium text-gray-700",
+                        ),
+                        rx.el.select(
+                            rx.el.option(
+                                "Seleccionar Categoría...",
+                                value="",
+                            ),
+                            rx.foreach(
+                                ProjectState.all_project_categories,
+                                lambda cat: rx.el.option(
+                                    cat["name"],
+                                    value=cat["id"],
+                                ),
+                            ),
+                            name="category_id",
+                            id="category_id",
+                            default_value=rx.cond(
+                                ProjectState.project_to_edit,
+                                ProjectState.project_to_edit[
+                                    "category_id"
+                                ].to_string(),
+                                "",
+                            ),
+                            key=rx.cond(
+                                ProjectState.editing_project_id
+                                != None,
+                                ProjectState.editing_project_id.to_string()
+                                + "-category",
+                                "new-project-category",
+                            ),
+                            class_name="w-full p-2 mt-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500",
+                        ),
+                        class_name="w-full md:w-1/2 px-2 mb-4",
                     ),
                     class_name="flex flex-wrap -mx-2",
                 ),

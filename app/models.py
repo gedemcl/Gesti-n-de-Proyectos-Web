@@ -1,5 +1,11 @@
 from typing import Literal, TypedDict
 
+
+class ProjectCategory(TypedDict):
+    id: int
+    name: str
+
+
 StatusType = Literal[
     "por hacer",
     "en progreso",
@@ -38,6 +44,8 @@ class Task(TypedDict):
     priority: PriorityType
     is_overdue: bool
     is_due_soon: bool
+    created_at: str
+    formatted_created_at: str
 
 
 class LogEntry(TypedDict):
@@ -59,6 +67,8 @@ class Project(TypedDict):
     description: str
     is_overdue: bool
     is_due_soon: bool
+    category_id: int | None
+    category_name: str | None
 
 
 class User(TypedDict):

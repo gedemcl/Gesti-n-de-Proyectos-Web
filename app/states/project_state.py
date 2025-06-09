@@ -8,8 +8,14 @@ from app.models import (
     VALID_PRIORITIES,
     VALID_STATUSES,
     VALID_PROJECT_STATUSES,
+    ProjectCategory,
 )
-from app.db_models import DBProject, DBTask, DBLogEntry
+from app.db_models import (
+    DBProject,
+    DBTask,
+    DBLogEntry,
+    DBProjectCategory,
+)
 from typing import cast, Union
 import datetime
 from dateutil.parser import isoparse
@@ -49,6 +55,22 @@ class ProjectState(rx.State):
                 self._initial_data_populated = True
                 self.last_updated_timestamp = time.time()
                 return
+            category1 = DBProjectCategory(
+                name="Infraestructura Urbana"
+            )
+            category2 = DBProjectCategory(
+                name="Modernización Tecnológica"
+            )
+            category3 = DBProjectCategory(
+                name="Desarrollo Comunitario"
+            )
+            category4 = DBProjectCategory(
+                name="Gestión Interna"
+            )
+            session.add_all(
+                [category1, category2, category3, category4]
+            )
+            session.flush()
             today = datetime.date.today()
             tomorrow = today + datetime.timedelta(days=1)
             yesterday = today - datetime.timedelta(days=1)
@@ -75,6 +97,7 @@ class ProjectState(rx.State):
                 "due_date": tomorrow,
                 "status": "ejecución",
                 "description": "Actualización completa de la plataforma web municipal.",
+                "category_id": category2.id,
             }
             db_project1 = DBProject(**project1_data)
             session.add(db_project1)
@@ -86,6 +109,7 @@ class ProjectState(rx.State):
                 "due_date": yesterday,
                 "status": "diseño",
                 "description": "Aplicación móvil para mejorar la comunicación con ciudadanos destacados.",
+                "category_id": category2.id,
             }
             db_project2 = DBProject(**project2_data)
             session.add(db_project2)
@@ -96,6 +120,7 @@ class ProjectState(rx.State):
                 "due_date": in_a_week,
                 "status": "idea",
                 "description": "Planificación y ejecución de la campaña de marketing para el último trimestre.",
+                "category_id": category4.id,
             }
             db_project3 = DBProject(**project3_data)
             session.add(db_project3)
@@ -108,6 +133,7 @@ class ProjectState(rx.State):
                 + datetime.timedelta(days=20),
                 "status": "ejecución",
                 "description": "Migración e implementación del nuevo sistema CRM.",
+                "category_id": category2.id,
             }
             db_project4 = DBProject(**project4_data)
             session.add(db_project4)
@@ -119,6 +145,7 @@ class ProjectState(rx.State):
                 + datetime.timedelta(days=45),
                 "status": "finalizado",
                 "description": "Coordinación completa del evento anual de la municipalidad.",
+                "category_id": category3.id,
             }
             db_project5 = DBProject(**project5_data)
             session.add(db_project5)
@@ -277,6 +304,12 @@ class ProjectState(rx.State):
                 db_project.due_date.strftime("%Y-%m-%d"),
                 days_threshold=7,
             ),
+            "category_id": db_project.category_id,
+            "category_name": (
+                db_project.category.name
+                if db_project.category
+                else "Sin Categoría"
+            ),
         }
 
     def _map_dbtask_to_tasktype(
@@ -284,6 +317,7 @@ class ProjectState(rx.State):
     ) -> TaskType:
         due_date_str = db_task.due_date.strftime("%Y-%m-%d")
         status_str = cast(StatusType, db_task.status)
+        created_at_str = db_task.created_at.isoformat()
         return {
             "id": db_task.id,
             "project_id": db_task.project_id,
@@ -299,6 +333,10 @@ class ProjectState(rx.State):
                 due_date_str, days_threshold=7
             )
             and status_str != "hecho",
+            "created_at": created_at_str,
+            "formatted_created_at": self.format_timestamp(
+                created_at_str
+            ),
         }
 
     def _map_dblogentry_to_logentrytype(
@@ -359,7 +397,13 @@ class ProjectState(rx.State):
                     )
                 )
             db_projects = (
-                session.exec(query.order_by(DBProject.name))
+                session.exec(
+                    query.options(
+                        sqlalchemy.orm.joinedload(
+                            DBProject.category
+                        )
+                    ).order_by(DBProject.name)
+                )
                 .scalars()
                 .all()
             )
@@ -548,6 +592,7 @@ class ProjectState(rx.State):
         due_date_str = form_data.get("due_date", "")
         status_str = form_data.get("status", "idea")
         description_str = form_data.get("description", "")
+        category_id_str = form_data.get("category_id", "")
         if not all(
             [
                 name,
@@ -581,6 +626,11 @@ class ProjectState(rx.State):
                 duration=3000,
             )
             return
+        category_id = (
+            int(category_id_str)
+            if category_id_str and category_id_str.isdigit()
+            else None
+        )
         if status_str not in VALID_PROJECT_STATUSES:
             yield rx.toast(
                 f"Estado de proyecto inválido.",
@@ -610,6 +660,7 @@ class ProjectState(rx.State):
             db_project.due_date = due_date_obj
             db_project.status = status_str
             db_project.description = description_str
+            db_project.category_id = category_id
             session.add(db_project)
             session.flush()
             if saved_project_id is None:
@@ -1024,6 +1075,26 @@ class ProjectState(rx.State):
                 ).scalar_one_or_none()
                 or 0
             )
+
+    @rx.var
+    def all_project_categories(
+        self,
+    ) -> list[ProjectCategory]:
+        _ = self.last_updated_timestamp
+        with rx.session() as session:
+            db_categories = (
+                session.exec(
+                    sqlalchemy.select(
+                        DBProjectCategory
+                    ).order_by(DBProjectCategory.name)
+                )
+                .scalars()
+                .all()
+            )
+            return [
+                {"id": cat.id, "name": cat.name}
+                for cat in db_categories
+            ]
 
     @rx.var
     def all_tasks(self) -> list[TaskType]:

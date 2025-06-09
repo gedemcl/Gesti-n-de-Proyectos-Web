@@ -15,6 +15,7 @@ from app.db_models import (
     DBProject,
     DBTask,
     DBLogEntry,
+    DBProjectCategory,
 )
 
 rx.Model.create_all()
