@@ -55,170 +55,148 @@ class ProjectState(rx.State):
                 self._initial_data_populated = True
                 self.last_updated_timestamp = time.time()
                 return
-            category1 = DBProjectCategory(
-                name="Infraestructura Urbana"
-            )
-            category2 = DBProjectCategory(
-                name="Modernización Tecnológica"
-            )
-            category3 = DBProjectCategory(
-                name="Desarrollo Comunitario"
-            )
-            category4 = DBProjectCategory(
-                name="Gestión Interna"
-            )
-            session.add_all(
-                [category1, category2, category3, category4]
-            )
-            session.flush()
-            today = datetime.date.today()
-            tomorrow = today + datetime.timedelta(days=1)
-            yesterday = today - datetime.timedelta(days=1)
-            in_a_week = today + datetime.timedelta(days=7)
-            current_user_display_name = "Sistema"
-            try:
-                auth_s = self.get_state_sync(AuthState)
-                if (
-                    auth_s
-                    and auth_s.current_user_display_name
-                ):
-                    current_user_display_name = (
-                        auth_s.current_user_display_name
+            categories_to_create = [
+                "Solicitudes varias",
+                "SEIM",
+                "RESALTOS",
+                "paraderos provisorios",
+                "Proyectos",
+                "Demarcaciones",
+                "Cierre de Pasajes",
+                "Señales Transitorias",
+                "SCAT",
+                "Estacionamientos Reservados",
+            ]
+            category_map = {}
+            for cat_name in categories_to_create:
+                existing_cat = (
+                    session.exec(
+                        sqlalchemy.select(
+                            DBProjectCategory
+                        ).where(
+                            DBProjectCategory.name
+                            == cat_name
+                        )
                     )
-            except Exception:
-                print(
-                    "Warning: AuthState not available during initial data population. Using default user 'Sistema'."
+                    .scalars()
+                    .first()
                 )
-            project1_data = {
-                "name": "Rediseño Sitio Web Principal",
-                "responsible": "Alicia Pérez",
-                "start_date": today
-                - datetime.timedelta(days=10),
-                "due_date": tomorrow,
-                "status": "ejecución",
-                "description": "Actualización completa de la plataforma web municipal.",
-                "category_id": category2.id,
-            }
-            db_project1 = DBProject(**project1_data)
-            session.add(db_project1)
-            project2_data = {
-                "name": "Desarrollo App Móvil Cliente VIP",
-                "responsible": "Roberto García",
-                "start_date": today
-                - datetime.timedelta(days=30),
-                "due_date": yesterday,
-                "status": "diseño",
-                "description": "Aplicación móvil para mejorar la comunicación con ciudadanos destacados.",
-                "category_id": category2.id,
-            }
-            db_project2 = DBProject(**project2_data)
-            session.add(db_project2)
-            project3_data = {
-                "name": "Campaña Marketing Q4",
-                "responsible": "Laura Gómez",
-                "start_date": today,
-                "due_date": in_a_week,
-                "status": "idea",
-                "description": "Planificación y ejecución de la campaña de marketing para el último trimestre.",
-                "category_id": category4.id,
-            }
-            db_project3 = DBProject(**project3_data)
-            session.add(db_project3)
-            project4_data = {
-                "name": "Implementación Nuevo CRM",
-                "responsible": "Alicia Pérez",
-                "start_date": today
-                - datetime.timedelta(days=5),
-                "due_date": today
-                + datetime.timedelta(days=20),
-                "status": "ejecución",
-                "description": "Migración e implementación del nuevo sistema CRM.",
-                "category_id": category2.id,
-            }
-            db_project4 = DBProject(**project4_data)
-            session.add(db_project4)
-            project5_data = {
-                "name": "Organización Evento Anual",
-                "responsible": "Roberto García",
-                "start_date": today,
-                "due_date": today
-                + datetime.timedelta(days=45),
-                "status": "finalizado",
-                "description": "Coordinación completa del evento anual de la municipalidad.",
-                "category_id": category3.id,
-            }
-            db_project5 = DBProject(**project5_data)
-            session.add(db_project5)
-            session.flush()
-            task1_data = {
-                "project_id": db_project1.id,
-                "description": "Diseñar mockups iniciales UX",
-                "due_date": today,
-                "status": "por hacer",
-                "priority": "alta",
-            }
-            session.add(DBTask(**task1_data))
-            task2_data = {
-                "project_id": db_project1.id,
-                "description": "Desarrollar prototipo de homepage interactivo",
-                "due_date": tomorrow,
-                "status": "en progreso",
-                "priority": "crítica",
-            }
-            session.add(DBTask(**task2_data))
-            task3_data = {
-                "project_id": db_project2.id,
-                "description": "Configurar servicios backend y base de datos",
-                "due_date": today
-                - datetime.timedelta(days=5),
-                "status": "hecho",
-                "priority": "media",
-            }
-            session.add(DBTask(**task3_data))
-            task4_data = {
-                "project_id": db_project3.id,
-                "description": "Definir KPIs de campaña",
-                "due_date": today
-                + datetime.timedelta(days=6),
-                "status": "por hacer",
-                "priority": "alta",
-            }
-            session.add(DBTask(**task4_data))
-            log1_data = {
-                "project_id": db_project1.id,
-                "action": "Proyecto 'Rediseño Sitio Web Principal' creado",
-                "user": current_user_display_name,
-            }
-            session.add(DBLogEntry(**log1_data))
-            log2_data = {
-                "project_id": db_project2.id,
-                "action": "Proyecto 'Desarrollo App Móvil Cliente VIP' creado",
-                "user": current_user_display_name,
-            }
-            session.add(DBLogEntry(**log2_data))
-            log3_data = {
-                "project_id": db_project3.id,
-                "action": "Proyecto 'Campaña Marketing Q4' creado",
-                "user": current_user_display_name,
-            }
-            session.add(DBLogEntry(**log3_data))
-            log4_data = {
-                "project_id": db_project1.id,
-                "action": "Tarea 'Diseñar mockups iniciales UX' añadida al proyecto 'Rediseño Sitio Web Principal'",
-                "user": current_user_display_name,
-            }
-            session.add(DBLogEntry(**log4_data))
-            log5_data = {
-                "project_id": None,
-                "action": "Usuario '17011128-1' inició sesión.",
-                "user": "17011128-1",
-            }
-            session.add(DBLogEntry(**log5_data))
+                if not existing_cat:
+                    new_cat = DBProjectCategory(
+                        name=cat_name
+                    )
+                    session.add(new_cat)
+                    session.flush()
+                    category_map[cat_name] = new_cat
+                else:
+                    category_map[cat_name] = existing_cat
             session.commit()
+            excel_data = [
+                {
+                    "Tarea": "Enviar Obs a nuevo recorrido Prov 1704",
+                    "Propietario": "Luis Contrera...",
+                    "Estado": "Completada",
+                    "Fecha de inicio": "4/03/2025",
+                    "Fecha de finalización": "",
+                    "Hito": "Hito",
+                    "Category": "Solicitudes varias",
+                },
+                {
+                    "Tarea": "Considerar Licencias digitales en Plan anual de Compras",
+                    "Propietario": "Luis Contrera...",
+                    "Estado": "Completada",
+                    "Fecha de inicio": "4/03/2025",
+                    "Fecha de finalización": "4/03/2025",
+                    "Hito": "Creación del proyecto de implementación de Licencias digitales",
+                    "Category": "Solicitudes varias",
+                },
+                {
+                    "Tarea": "Informe de Carabineros por hoyos en aceras",
+                    "Propietario": "Luis Contrera...",
+                    "Estado": "Completada",
+                    "Fecha de inicio": "19/02/2025",
+                    "Fecha de finalización": "11/03/2025",
+                    "Hito": "Se enviaron Ord a DIMAO (115) DOM(111)",
+                    "Category": "SEIM",
+                },
+                {
+                    "Tarea": "Lomillos",
+                    "Propietario": "Luis Contrera...",
+                    "Estado": "En curso",
+                    "Fecha de inicio": "13/01/2025",
+                    "Fecha de finalización": "20/02/2025",
+                    "Hito": "Conversar con Administrador para ver si desean continuar con Programa",
+                    "Category": "SEIM",
+                },
+                {
+                    "Tarea": "Informe tecnico Bremen entre Chapiquiña y Baden",
+                    "Propietario": "Luis Contrera...",
+                    "Estado": "Completada",
+                    "Fecha de inicio": "05/02/2025",
+                    "Fecha de finalización": "11/03/2025",
+                    "Hito": "Oficio de Dir Transito a DIPRESEH",
+                    "Category": "RESALTOS",
+                },
+            ]
+            for item in excel_data:
+                try:
+                    start_date = datetime.datetime.strptime(
+                        item["Fecha de inicio"], "%d/%m/%Y"
+                    ).date()
+                    due_date = (
+                        datetime.datetime.strptime(
+                            item["Fecha de finalización"],
+                            "%d/%m/%Y",
+                        ).date()
+                        if item["Fecha de finalización"]
+                        else None
+                    )
+                    status_map = {
+                        "Completada": "finalizado",
+                        "En curso": "ejecución",
+                        "No iniciada": "no iniciada",
+                    }
+                    project_status = status_map.get(
+                        item["Estado"], "idea"
+                    )
+                    category_id = (
+                        category_map[item["Category"]].id
+                        if item["Category"] in category_map
+                        else None
+                    )
+                    project = DBProject(
+                        name=item["Tarea"],
+                        responsible=item["Propietario"],
+                        start_date=start_date,
+                        due_date=due_date,
+                        status=project_status,
+                        category_id=category_id,
+                    )
+                    session.add(project)
+                    session.flush()
+                    task_status = (
+                        "hecho"
+                        if project_status == "finalizado"
+                        else "por hacer"
+                    )
+                    task = DBTask(
+                        project_id=project.id,
+                        description=item["Hito"],
+                        due_date=due_date,
+                        status=task_status,
+                        priority="media",
+                    )
+                    session.add(task)
+                    session.commit()
+                except Exception as e:
+                    session.rollback()
+                    print(
+                        f"Could not add item {item['Tarea']}: {e}"
+                    )
             self._initial_data_populated = True
             self.last_updated_timestamp = time.time()
             print(
-                "Initial project data populated into database."
+                "Initial project data from excel populated into database."
             )
 
     @rx.event
@@ -285,6 +263,11 @@ class ProjectState(rx.State):
     def _map_dbproject_to_projecttype(
         self, db_project: DBProject
     ) -> ProjectType:
+        due_date_str = (
+            db_project.due_date.strftime("%Y-%m-%d")
+            if db_project.due_date
+            else None
+        )
         return {
             "id": db_project.id,
             "name": db_project.name,
@@ -292,17 +275,14 @@ class ProjectState(rx.State):
             "start_date": db_project.start_date.strftime(
                 "%Y-%m-%d"
             ),
-            "due_date": db_project.due_date.strftime(
-                "%Y-%m-%d"
-            ),
+            "due_date": due_date_str,
             "status": cast(StatusType, db_project.status),
-            "description": db_project.description or "",
+            "description": db_project.description,
             "is_overdue": self.is_date_overdue(
-                db_project.due_date.strftime("%Y-%m-%d")
+                due_date_str
             ),
             "is_due_soon": self.is_date_due_soon(
-                db_project.due_date.strftime("%Y-%m-%d"),
-                days_threshold=7,
+                due_date_str, days_threshold=7
             ),
             "category_id": db_project.category_id,
             "category_name": (
@@ -315,7 +295,11 @@ class ProjectState(rx.State):
     def _map_dbtask_to_tasktype(
         self, db_task: DBTask
     ) -> TaskType:
-        due_date_str = db_task.due_date.strftime("%Y-%m-%d")
+        due_date_str = (
+            db_task.due_date.strftime("%Y-%m-%d")
+            if db_task.due_date
+            else None
+        )
         status_str = cast(StatusType, db_task.status)
         created_at_str = db_task.created_at.isoformat()
         return {
@@ -373,7 +357,7 @@ class ProjectState(rx.State):
                         DBProject.due_date
                         <= filter_date_obj
                     )
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
             if self.filter_responsible:
                 query = query.where(
@@ -453,7 +437,7 @@ class ProjectState(rx.State):
                 mapped_tasks,
                 key=lambda t: (
                     VALID_PRIORITIES.index(t["priority"]),
-                    t["due_date"],
+                    t["due_date"] or "9999-12-31",
                 ),
             )
 
@@ -594,16 +578,10 @@ class ProjectState(rx.State):
         description_str = form_data.get("description", "")
         category_id_str = form_data.get("category_id", "")
         if not all(
-            [
-                name,
-                responsible,
-                start_date_str,
-                due_date_str,
-                status_str,
-            ]
+            [name, responsible, start_date_str, status_str]
         ):
             yield rx.toast(
-                "Nombre, responsable, fechas y estado del proyecto son obligatorios.",
+                "Nombre, responsable, fecha de inicio y estado del proyecto son obligatorios.",
                 duration=3000,
             )
             return
@@ -611,10 +589,17 @@ class ProjectState(rx.State):
             start_date_obj = datetime.datetime.strptime(
                 start_date_str, "%Y-%m-%d"
             ).date()
-            due_date_obj = datetime.datetime.strptime(
-                due_date_str, "%Y-%m-%d"
-            ).date()
-            if start_date_obj > due_date_obj:
+            due_date_obj = (
+                datetime.datetime.strptime(
+                    due_date_str, "%Y-%m-%d"
+                ).date()
+                if due_date_str
+                else None
+            )
+            if (
+                due_date_obj
+                and start_date_obj > due_date_obj
+            ):
                 yield rx.toast(
                     "La fecha de inicio no puede ser posterior a la fecha límite.",
                     duration=3000,
@@ -679,16 +664,20 @@ class ProjectState(rx.State):
                 and (project_action == "creado")
             ):
                 new_task_due_date_str = form_data.get(
-                    "new_task_due_date", due_date_str
+                    "new_task_due_date"
                 )
-                try:
-                    new_task_due_obj = (
-                        datetime.datetime.strptime(
-                            new_task_due_date_str,
-                            "%Y-%m-%d",
-                        ).date()
-                    )
-                except ValueError:
+                new_task_due_obj = None
+                if new_task_due_date_str:
+                    try:
+                        new_task_due_obj = (
+                            datetime.datetime.strptime(
+                                new_task_due_date_str,
+                                "%Y-%m-%d",
+                            ).date()
+                        )
+                    except ValueError:
+                        pass
+                else:
                     new_task_due_obj = due_date_obj
                 db_task = DBTask(
                     project_id=saved_project_id,
@@ -839,16 +828,20 @@ class ProjectState(rx.State):
                 duration=3000,
             )
             return
-        if not all([description, due_date_str]):
+        if not description:
             yield rx.toast(
-                "La descripción y la fecha límite de la tarea son obligatorias.",
+                "La descripción de la tarea es obligatoria.",
                 duration=3000,
             )
             return
         try:
-            due_date_obj = datetime.datetime.strptime(
-                due_date_str, "%Y-%m-%d"
-            ).date()
+            due_date_obj = (
+                datetime.datetime.strptime(
+                    due_date_str, "%Y-%m-%d"
+                ).date()
+                if due_date_str
+                else None
+            )
         except ValueError:
             yield rx.toast(
                 "Formato de fecha inválido para la tarea. Use YYYY-MM-DD.",
@@ -985,7 +978,9 @@ class ProjectState(rx.State):
         )
 
     def is_date_due_soon(
-        self, due_date_str: str, days_threshold: int = 7
+        self,
+        due_date_str: str | None,
+        days_threshold: int = 7,
     ) -> bool:
         if not due_date_str:
             return False
@@ -1000,10 +995,12 @@ class ProjectState(rx.State):
                 <= today
                 + datetime.timedelta(days=days_threshold)
             )
-        except ValueError:
+        except (ValueError, TypeError):
             return False
 
-    def is_date_overdue(self, due_date_str: str) -> bool:
+    def is_date_overdue(
+        self, due_date_str: str | None
+    ) -> bool:
         if not due_date_str:
             return False
         try:
@@ -1012,7 +1009,7 @@ class ProjectState(rx.State):
             ).date()
             today = datetime.date.today()
             return due_date < today
-        except ValueError:
+        except (ValueError, TypeError):
             return False
 
     def format_timestamp(self, timestamp_str: str) -> str:
@@ -1182,6 +1179,12 @@ class ProjectState(rx.State):
         )
 
     @rx.var
+    def projects_no_iniciada_count(self) -> int:
+        return self._get_project_count_by_status(
+            "no iniciada"
+        )
+
+    @rx.var
     def projects_due_soon_count(self) -> int:
         _ = self.last_updated_timestamp
         with rx.session() as session:
@@ -1194,6 +1197,7 @@ class ProjectState(rx.State):
                     sqlalchemy.select(
                         sqlalchemy.func.count(DBProject.id)
                     )
+                    .where(DBProject.due_date != None)
                     .where(DBProject.due_date >= today)
                     .where(
                         DBProject.due_date
@@ -1214,6 +1218,7 @@ class ProjectState(rx.State):
                     sqlalchemy.select(
                         sqlalchemy.func.count(DBProject.id)
                     )
+                    .where(DBProject.due_date != None)
                     .where(DBProject.due_date < today)
                     .where(DBProject.status != "finalizado")
                 ).scalar_one_or_none()
@@ -1230,12 +1235,14 @@ class ProjectState(rx.State):
             "diseño": "#8B5CF6",
             "ejecución": "#FBBF24",
             "finalizado": "#10B981",
+            "no iniciada": "#6B7280",
         }
         counts = {
             "idea": self.projects_idea_count,
             "diseño": self.projects_diseno_count,
             "ejecución": self.projects_ejecucion_count,
             "finalizado": self.projects_finalizado_count,
+            "no iniciada": self.projects_no_iniciada_count,
         }
         return [
             {

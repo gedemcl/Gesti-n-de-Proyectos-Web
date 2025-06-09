@@ -61,7 +61,7 @@ class DBProject(rx.Model, table=True):
     name: str = Field(index=True, nullable=False)
     responsible: str = Field(nullable=False)
     start_date: datetime.date = Field(nullable=False)
-    due_date: datetime.date = Field(nullable=False)
+    due_date: datetime.date | None = Field(default=None)
     status: str = Field(nullable=False)
     description: str | None = Field(default=None)
     category_id: int | None = Field(
@@ -84,7 +84,7 @@ class DBTask(rx.Model, table=True):
         default=None, primary_key=True, index=True
     )
     description: str = Field(nullable=False)
-    due_date: datetime.date = Field(nullable=False)
+    due_date: datetime.date | None = Field(default=None)
     status: str = Field(nullable=False)
     priority: str = Field(nullable=False)
     created_at: datetime.datetime = Field(
