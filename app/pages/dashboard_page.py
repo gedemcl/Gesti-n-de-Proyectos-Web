@@ -81,7 +81,34 @@ def dashboard_content() -> rx.Component:
                 ProjectState.projects_overdue_count,
                 "text-red-600",
             ),
-            class_name="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8",
+            class_name="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8",
+        ),
+        rx.el.h2(
+            "Resumen de Tareas",
+            class_name="text-2xl font-semibold text-gray-700 mb-4 mt-8",
+        ),
+        rx.el.div(
+            status_summary_card(
+                "Total Tareas",
+                ProjectState.total_tasks_count,
+                "text-indigo-600",
+            ),
+            status_summary_card(
+                "Por Hacer",
+                ProjectState.tasks_por_hacer_count,
+                "text-gray-500",
+            ),
+            status_summary_card(
+                "En Progreso",
+                ProjectState.tasks_en_progreso_count,
+                "text-yellow-500",
+            ),
+            status_summary_card(
+                "Hechas",
+                ProjectState.tasks_hecho_count,
+                "text-green-500",
+            ),
+            class_name="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8",
         ),
         rx.el.div(
             rx.el.div(
@@ -229,34 +256,75 @@ def dashboard_content() -> rx.Component:
             class_name="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8",
         ),
         rx.el.div(
-            rx.el.h3(
-                "Distribución de Proyectos por Estado (Gráfico Circular)",
-                class_name="text-xl font-semibold text-gray-700 mt-8 mb-4",
+            rx.el.div(
+                rx.el.h3(
+                    "Distribución de Proyectos por Estado",
+                    class_name="text-xl font-semibold text-gray-700 mb-4",
+                ),
+                rx.el.div(
+                    rx.recharts.pie_chart(
+                        rx.recharts.graphing_tooltip(
+                            class_name=RECHARTS_TOOLTIP_STYLE_CLASS_NAME
+                        ),
+                        rx.recharts.pie(
+                            rx.foreach(
+                                ProjectState.project_status_distribution,
+                                lambda item: rx.recharts.cell(
+                                    fill=item["fill"]
+                                ),
+                            ),
+                            data=ProjectState.project_status_distribution,
+                            data_key="value",
+                            name_key="name",
+                            cx="50%",
+                            cy="50%",
+                            outer_radius=100,
+                            label=True,
+                        ),
+                        rx.recharts.legend(
+                            icon_size=10, icon_type="square"
+                        ),
+                        width="100%",
+                        height=350,
+                    ),
+                    class_name="bg-white p-4 rounded-lg shadow",
+                ),
             ),
             rx.el.div(
-                rx.recharts.pie_chart(
-                    rx.recharts.graphing_tooltip(
-                        class_name=RECHARTS_TOOLTIP_STYLE_CLASS_NAME
-                    ),
-                    rx.recharts.pie(
-                        data=ProjectState.project_status_distribution,
-                        data_key="value",
-                        name_key="name",
-                        cx="50%",
-                        cy="50%",
-                        outer_radius=100,
-                        fill="#8884d8",
-                        label=True,
-                    ),
-                    rx.recharts.legend(
-                        icon_size=10, icon_type="square"
-                    ),
-                    width="100%",
-                    height=350,
+                rx.el.h3(
+                    "Distribución de Tareas por Estado",
+                    class_name="text-xl font-semibold text-gray-700 mb-4",
                 ),
-                class_name="bg-white p-4 rounded-lg shadow",
+                rx.el.div(
+                    rx.recharts.pie_chart(
+                        rx.recharts.graphing_tooltip(
+                            class_name=RECHARTS_TOOLTIP_STYLE_CLASS_NAME
+                        ),
+                        rx.recharts.pie(
+                            rx.foreach(
+                                ProjectState.task_status_distribution,
+                                lambda item: rx.recharts.cell(
+                                    fill=item["fill"]
+                                ),
+                            ),
+                            data=ProjectState.task_status_distribution,
+                            data_key="value",
+                            name_key="name",
+                            cx="50%",
+                            cy="50%",
+                            outer_radius=100,
+                            label=True,
+                        ),
+                        rx.recharts.legend(
+                            icon_size=10, icon_type="square"
+                        ),
+                        width="100%",
+                        height=350,
+                    ),
+                    class_name="bg-white p-4 rounded-lg shadow",
+                ),
             ),
-            class_name="mt-8",
+            class_name="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8",
         ),
         rx.el.h2(
             "Actividad Reciente (Bitácora General)",

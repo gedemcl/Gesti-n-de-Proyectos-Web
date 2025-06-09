@@ -987,6 +987,17 @@ class ProjectState(rx.State):
                 or 0
             )
 
+    def _get_task_count_by_status(self, status: str) -> int:
+        with rx.session() as session:
+            return (
+                session.exec(
+                    sqlalchemy.select(
+                        sqlalchemy.func.count(DBTask.id)
+                    ).where(DBTask.status == status)
+                ).scalar_one_or_none()
+                or 0
+            )
+
     @rx.var
     def total_projects_count(self) -> int:
         with rx.session() as session:
@@ -1060,6 +1071,12 @@ class ProjectState(rx.State):
     def project_status_distribution(
         self,
     ) -> list[dict[str, str | int]]:
+        colors = {
+            "idea": "#3B82F6",
+            "diseño": "#8B5CF6",
+            "ejecución": "#FBBF24",
+            "finalizado": "#10B981",
+        }
         counts = {
             "idea": self.projects_idea_count,
             "diseño": self.projects_diseno_count,
@@ -1070,6 +1087,7 @@ class ProjectState(rx.State):
             {
                 "name": status.capitalize(),
                 "value": count_val,
+                "fill": colors.get(status, "#A0AEC0"),
             }
             for status, count_val in counts.items()
             if count_val > 0
@@ -1171,3 +1189,51 @@ class ProjectState(rx.State):
                     }
                 )
         return data_to_return
+
+    @rx.var
+    def total_tasks_count(self) -> int:
+        with rx.session() as session:
+            return (
+                session.exec(
+                    sqlalchemy.select(
+                        sqlalchemy.func.count(DBTask.id)
+                    )
+                ).scalar_one_or_none()
+                or 0
+            )
+
+    @rx.var
+    def tasks_por_hacer_count(self) -> int:
+        return self._get_task_count_by_status("por hacer")
+
+    @rx.var
+    def tasks_en_progreso_count(self) -> int:
+        return self._get_task_count_by_status("en progreso")
+
+    @rx.var
+    def tasks_hecho_count(self) -> int:
+        return self._get_task_count_by_status("hecho")
+
+    @rx.var
+    def task_status_distribution(
+        self,
+    ) -> list[dict[str, str | int]]:
+        colors = {
+            "por hacer": "#A0AEC0",
+            "en progreso": "#ECC94B",
+            "hecho": "#48BB78",
+        }
+        counts = {
+            "por hacer": self.tasks_por_hacer_count,
+            "en progreso": self.tasks_en_progreso_count,
+            "hecho": self.tasks_hecho_count,
+        }
+        return [
+            {
+                "name": status.capitalize(),
+                "value": data_count,
+                "fill": colors.get(status, "#A0AEC0"),
+            }
+            for status, data_count in counts.items()
+            if data_count > 0
+        ]
