@@ -28,6 +28,7 @@ class AuthState(rx.State):
     current_password_input: str = ""
     new_password_input: str = ""
     confirm_new_password_input: str = ""
+    show_login_password: bool = False
     _initial_admin_created: bool = False
 
     @rx.event
@@ -359,6 +360,10 @@ class AuthState(rx.State):
             self.new_password_input = ""
             self.confirm_new_password_input = ""
             self.error_message = ""
+
+    @rx.event
+    def toggle_show_login_password(self):
+        self.show_login_password = not self.show_login_password
 
     @rx.event
     def change_password_current_user(self, form_data: dict):
