@@ -6,18 +6,32 @@ from app.constants import RECHARTS_TOOLTIP_STYLE_CLASS_NAME
 
 
 def status_summary_card(
-    status: str, count: rx.Var[int] | int, color_class: str
+    status_display: str,
+    count: rx.Var[int] | int,
+    color_class: str,
+    status_filter: str = "todos",
 ) -> rx.Component:
     return rx.el.div(
         rx.el.h3(
-            status.capitalize(),
+            status_display,
             class_name="text-lg font-semibold text-gray-700",
         ),
         rx.el.p(
             count.to_string(),
             class_name=f"text-4xl font-bold {color_class}",
         ),
-        class_name="bg-white p-6 rounded-lg shadow-md text-center",
+        class_name=rx.cond(
+            status_filter != "todos",
+            "bg-white p-6 rounded-lg shadow-md text-center cursor-pointer hover:scale-105 transition-transform",
+            "bg-white p-6 rounded-lg shadow-md text-center",
+        ),
+        on_click=rx.cond(
+            status_filter != "todos",
+            ProjectState.filter_by_status_and_redirect(
+                status_filter
+            ),
+            None,
+        ),
     )
 
 
@@ -32,26 +46,31 @@ def dashboard_content() -> rx.Component:
                 "Total Proyectos",
                 ProjectState.total_projects_count,
                 "text-indigo-600",
+                "todos",
             ),
             status_summary_card(
                 "En Idea",
                 ProjectState.projects_idea_count,
                 "text-blue-500",
+                "idea",
             ),
             status_summary_card(
                 "En Diseño",
                 ProjectState.projects_diseno_count,
                 "text-purple-500",
+                "diseño",
             ),
             status_summary_card(
                 "En Ejecución",
                 ProjectState.projects_ejecucion_count,
                 "text-yellow-500",
+                "ejecución",
             ),
             status_summary_card(
                 "Finalizados",
                 ProjectState.projects_finalizado_count,
                 "text-green-500",
+                "finalizado",
             ),
             status_summary_card(
                 "Vencen Pronto (<7 días)",

@@ -972,6 +972,14 @@ class ProjectState(rx.State):
         self.filter_log_project_status = "todos"
         self.filter_log_action_text = ""
 
+    @rx.event
+    def filter_by_status_and_redirect(self, status: str):
+        self.filter_status = status
+        self.search_term = ""
+        self.filter_due_date = ""
+        self.filter_responsible = ""
+        return rx.redirect("/proyectos")
+
     def _get_project_count_by_status(
         self, status: StatusType
     ) -> int:
