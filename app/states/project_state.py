@@ -310,7 +310,7 @@ class ProjectState(rx.State):
     def filtered_project_list(self) -> list[ProjectType]:
         with rx.session() as session:
             query = sqlalchemy.select(DBProject)
-            if self.filter_status != "todos":
+            if self.filter_status in VALID_PROJECT_STATUSES:
                 query = query.where(
                     DBProject.status == self.filter_status
                 )
@@ -987,16 +987,52 @@ class ProjectState(rx.State):
                 or 0
             )
 
-    def _get_task_count_by_status(self, status: str) -> int:
+    @rx.var
+    def all_tasks(self) -> list[TaskType]:
         with rx.session() as session:
-            return (
-                session.exec(
-                    sqlalchemy.select(
-                        sqlalchemy.func.count(DBTask.id)
-                    ).where(DBTask.status == status)
-                ).scalar_one_or_none()
-                or 0
+            db_tasks = (
+                session.exec(sqlalchemy.select(DBTask))
+                .scalars()
+                .all()
             )
+            return [
+                self._map_dbtask_to_tasktype(t)
+                for t in db_tasks
+            ]
+
+    @rx.var
+    def total_tasks_count(self) -> int:
+        return len(self.all_tasks)
+
+    @rx.var
+    def tasks_por_hacer_count(self) -> int:
+        return len(
+            [
+                t
+                for t in self.all_tasks
+                if t["status"] == "por hacer"
+            ]
+        )
+
+    @rx.var
+    def tasks_en_progreso_count(self) -> int:
+        return len(
+            [
+                t
+                for t in self.all_tasks
+                if t["status"] == "en progreso"
+            ]
+        )
+
+    @rx.var
+    def tasks_hecho_count(self) -> int:
+        return len(
+            [
+                t
+                for t in self.all_tasks
+                if t["status"] == "hecho"
+            ]
+        )
 
     @rx.var
     def total_projects_count(self) -> int:
@@ -1189,30 +1225,6 @@ class ProjectState(rx.State):
                     }
                 )
         return data_to_return
-
-    @rx.var
-    def total_tasks_count(self) -> int:
-        with rx.session() as session:
-            return (
-                session.exec(
-                    sqlalchemy.select(
-                        sqlalchemy.func.count(DBTask.id)
-                    )
-                ).scalar_one_or_none()
-                or 0
-            )
-
-    @rx.var
-    def tasks_por_hacer_count(self) -> int:
-        return self._get_task_count_by_status("por hacer")
-
-    @rx.var
-    def tasks_en_progreso_count(self) -> int:
-        return self._get_task_count_by_status("en progreso")
-
-    @rx.var
-    def tasks_hecho_count(self) -> int:
-        return self._get_task_count_by_status("hecho")
 
     @rx.var
     def task_status_distribution(
