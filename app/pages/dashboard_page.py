@@ -46,7 +46,6 @@ def dashboard_content() -> rx.Component:
                 "Total Proyectos",
                 ProjectState.total_projects_count,
                 "text-indigo-600",
-                "todos",
             ),
             status_summary_card(
                 "En Idea",

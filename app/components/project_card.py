@@ -52,7 +52,7 @@ def project_card(project: ProjectType) -> rx.Component:
             ),
             class_name="flex-grow cursor-pointer p-4",
             on_click=lambda: rx.redirect(
-                "/proyectos/" + str(project["id"])
+                f"/proyectos/{project['id']}"
             ),
         ),
         rx.el.div(

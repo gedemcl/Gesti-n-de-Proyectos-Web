@@ -936,19 +936,15 @@ class ProjectState(rx.State):
         except (ValueError, TypeError):
             return "Fecha Inválida"
 
-    @rx.event
     def set_search_term(self, term: str):
         self.search_term = term.strip()
 
-    @rx.event
     def set_filter_status(self, status: str):
         self.filter_status = status
 
-    @rx.event
     def set_filter_due_date(self, date: str):
         self.filter_due_date = date
 
-    @rx.event
     def set_filter_responsible(self, responsible: str):
         self.filter_responsible = responsible.strip()
 
@@ -959,11 +955,9 @@ class ProjectState(rx.State):
         self.filter_responsible = ""
         self.search_term = ""
 
-    @rx.event
     def set_filter_log_project_status(self, status: str):
         self.filter_log_project_status = status
 
-    @rx.event
     def set_filter_log_action_text(self, text: str):
         self.filter_log_action_text = text.strip()
 
