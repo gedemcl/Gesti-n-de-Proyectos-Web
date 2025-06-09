@@ -270,7 +270,9 @@ def dashboard_content() -> rx.Component:
                             rx.foreach(
                                 ProjectState.project_status_distribution,
                                 lambda item: rx.recharts.cell(
-                                    fill=item["fill"]
+                                    fill=item["fill"].to(
+                                        str
+                                    )
                                 ),
                             ),
                             data=ProjectState.project_status_distribution,
@@ -304,7 +306,9 @@ def dashboard_content() -> rx.Component:
                             rx.foreach(
                                 ProjectState.task_status_distribution,
                                 lambda item: rx.recharts.cell(
-                                    fill=item["fill"]
+                                    fill=item["fill"].to(
+                                        str
+                                    )
                                 ),
                             ),
                             data=ProjectState.task_status_distribution,
