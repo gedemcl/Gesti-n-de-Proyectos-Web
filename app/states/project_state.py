@@ -16,6 +16,7 @@ from dateutil.parser import isoparse
 from app.states.auth_state import AuthState
 from collections import Counter
 import sqlalchemy
+import time
 
 
 class ProjectState(rx.State):
@@ -33,6 +34,7 @@ class ProjectState(rx.State):
     filter_log_action_text: str = ""
     dashboard_filter_project_status: str = "todos"
     _initial_data_populated: bool = False
+    last_updated_timestamp: float = 0.0
 
     @rx.event
     def on_load_populate_initial_data(self):
@@ -45,6 +47,7 @@ class ProjectState(rx.State):
                 .first()
             ):
                 self._initial_data_populated = True
+                self.last_updated_timestamp = time.time()
                 return
             today = datetime.date.today()
             tomorrow = today + datetime.timedelta(days=1)
@@ -186,13 +189,18 @@ class ProjectState(rx.State):
             session.add(DBLogEntry(**log5_data))
             session.commit()
             self._initial_data_populated = True
+            self.last_updated_timestamp = time.time()
             print(
                 "Initial project data populated into database."
             )
 
     @rx.event
+    def force_update(self):
+        self.last_updated_timestamp = time.time()
+
+    @rx.event
     async def on_load(self) -> None:
-        pass
+        yield ProjectState.force_update
 
     @rx.event
     async def load_project_for_detail_page(self):
@@ -223,6 +231,7 @@ class ProjectState(rx.State):
                 position="top-center",
             )
             yield rx.redirect("/proyectos")
+        yield ProjectState.force_update
 
     async def _add_log_entry_db(
         self,
@@ -308,9 +317,10 @@ class ProjectState(rx.State):
 
     @rx.var
     def filtered_project_list(self) -> list[ProjectType]:
+        _ = self.last_updated_timestamp
         with rx.session() as session:
             query = sqlalchemy.select(DBProject)
-            if self.filter_status in VALID_PROJECT_STATUSES:
+            if self.filter_status != "todos":
                 query = query.where(
                     DBProject.status == self.filter_status
                 )
@@ -360,6 +370,7 @@ class ProjectState(rx.State):
 
     @rx.var
     def selected_project(self) -> ProjectType | None:
+        _ = self.last_updated_timestamp
         if self.selected_project_id is None:
             return None
         with rx.session() as session:
@@ -376,6 +387,7 @@ class ProjectState(rx.State):
 
     @rx.var
     def tasks_for_selected_project(self) -> list[TaskType]:
+        _ = self.last_updated_timestamp
         if self.selected_project_id is None:
             return []
         with rx.session() as session:
@@ -405,6 +417,7 @@ class ProjectState(rx.State):
     def logs_for_selected_project(
         self,
     ) -> list[LogEntryType]:
+        _ = self.last_updated_timestamp
         if self.selected_project_id is None:
             return []
         with rx.session() as session:
@@ -427,6 +440,7 @@ class ProjectState(rx.State):
 
     @rx.var
     def all_log_entries(self) -> list[LogEntryType]:
+        _ = self.last_updated_timestamp
         with rx.session() as session:
             db_logs = (
                 session.exec(
@@ -444,11 +458,13 @@ class ProjectState(rx.State):
 
     @rx.var
     def recent_log_entries(self) -> list[LogEntryType]:
+        _ = self.last_updated_timestamp
         all_entries = self.all_log_entries
         return all_entries[:10]
 
     @rx.var
     def filtered_log_entries(self) -> list[LogEntryType]:
+        _ = self.last_updated_timestamp
         logs_query = sqlalchemy.select(DBLogEntry)
         if self.filter_log_project_status != "todos":
             project_ids_with_status = sqlalchemy.select(
@@ -541,10 +557,11 @@ class ProjectState(rx.State):
                 status_str,
             ]
         ):
-            return rx.toast(
+            yield rx.toast(
                 "Nombre, responsable, fechas y estado del proyecto son obligatorios.",
                 duration=3000,
             )
+            return
         try:
             start_date_obj = datetime.datetime.strptime(
                 start_date_str, "%Y-%m-%d"
@@ -553,20 +570,23 @@ class ProjectState(rx.State):
                 due_date_str, "%Y-%m-%d"
             ).date()
             if start_date_obj > due_date_obj:
-                return rx.toast(
+                yield rx.toast(
                     "La fecha de inicio no puede ser posterior a la fecha límite.",
                     duration=3000,
                 )
+                return
         except ValueError:
-            return rx.toast(
+            yield rx.toast(
                 "Formato de fecha inválido. Use YYYY-MM-DD.",
                 duration=3000,
             )
+            return
         if status_str not in VALID_PROJECT_STATUSES:
-            return rx.toast(
+            yield rx.toast(
                 f"Estado de proyecto inválido.",
                 duration=3000,
             )
+            return
         project_action = "actualizado"
         saved_project_id: int | None = None
         with rx.session() as session:
@@ -575,10 +595,11 @@ class ProjectState(rx.State):
                     DBProject, self.editing_project_id
                 )
                 if not db_project:
-                    return rx.toast(
+                    yield rx.toast(
                         "Proyecto no encontrado para editar.",
                         duration=3000,
                     )
+                    return
                 saved_project_id = self.editing_project_id
             else:
                 db_project = DBProject()
@@ -634,7 +655,8 @@ class ProjectState(rx.State):
             session.commit()
         self.show_project_form_dialog = False
         self.editing_project_id = None
-        return rx.toast(
+        yield ProjectState.force_update
+        yield rx.toast(
             f"Proyecto '{name}' {project_action} exitosamente.",
             duration=3000,
         )
@@ -678,6 +700,7 @@ class ProjectState(rx.State):
                 if self.selected_project_id == project_id:
                     self.selected_project_id = None
                     yield rx.redirect("/proyectos")
+                yield ProjectState.force_update
                 yield rx.toast(
                     f"Proyecto '{project_name}' eliminado.",
                     duration=3000,
@@ -730,13 +753,15 @@ class ProjectState(rx.State):
         priority_str = form_data.get("priority", "media")
         status_str = form_data.get("status", "por hacer")
         if priority_str not in VALID_PRIORITIES:
-            return rx.toast(
+            yield rx.toast(
                 f"Prioridad inválida.", duration=3000
             )
+            return
         if status_str not in VALID_STATUSES:
-            return rx.toast(
+            yield rx.toast(
                 f"Estado de tarea inválido.", duration=3000
             )
+            return
         current_project_id_for_task: int | None = None
         if self.editing_task_id is not None:
             with rx.session() as session:
@@ -748,33 +773,37 @@ class ProjectState(rx.State):
                         task_db.project_id
                     )
                 else:
-                    return rx.toast(
+                    yield rx.toast(
                         "Tarea para editar no encontrada.",
                         duration=3000,
                     )
+                    return
         else:
             current_project_id_for_task = (
                 self.selected_project_id
             )
         if current_project_id_for_task is None:
-            return rx.toast(
+            yield rx.toast(
                 "No hay contexto de proyecto para esta tarea. Seleccione un proyecto.",
                 duration=3000,
             )
+            return
         if not all([description, due_date_str]):
-            return rx.toast(
+            yield rx.toast(
                 "La descripción y la fecha límite de la tarea son obligatorias.",
                 duration=3000,
             )
+            return
         try:
             due_date_obj = datetime.datetime.strptime(
                 due_date_str, "%Y-%m-%d"
             ).date()
         except ValueError:
-            return rx.toast(
+            yield rx.toast(
                 "Formato de fecha inválido para la tarea. Use YYYY-MM-DD.",
                 duration=3000,
             )
+            return
         task_action = "actualizada"
         with rx.session() as session:
             if self.editing_task_id is not None:
@@ -782,10 +811,11 @@ class ProjectState(rx.State):
                     DBTask, self.editing_task_id
                 )
                 if not db_task:
-                    return rx.toast(
+                    yield rx.toast(
                         "Tarea no encontrada para editar.",
                         duration=3000,
                     )
+                    return
             else:
                 db_task = DBTask(
                     project_id=current_project_id_for_task
@@ -804,7 +834,8 @@ class ProjectState(rx.State):
             session.commit()
         self.show_task_form_dialog = False
         self.editing_task_id = None
-        return rx.toast(
+        yield ProjectState.force_update
+        yield rx.toast(
             f"Tarea '{description}' {task_action} exitosamente.",
             duration=3000,
         )
@@ -823,12 +854,13 @@ class ProjectState(rx.State):
                     project_id=project_id_for_log,
                 )
                 session.commit()
-                return rx.toast(
+                yield ProjectState.force_update
+                yield rx.toast(
                     f"Tarea '{task_description}' eliminada.",
                     duration=3000,
                 )
             else:
-                return rx.toast(
+                yield rx.toast(
                     "Tarea no encontrada para eliminar.",
                     duration=3000,
                 )
@@ -838,9 +870,10 @@ class ProjectState(rx.State):
         self, task_id: int, new_status_str: str
     ):
         if new_status_str not in VALID_STATUSES:
-            return rx.toast(
+            yield rx.toast(
                 f"Estado de tarea inválido.", duration=3000
             )
+            return
         new_status = cast(StatusType, new_status_str)
         with rx.session() as session:
             db_task = session.get(DBTask, task_id)
@@ -854,7 +887,8 @@ class ProjectState(rx.State):
                     project_id=db_task.project_id,
                 )
                 session.commit()
-                return rx.toast(
+                yield ProjectState.force_update
+                yield rx.toast(
                     f"Estado de tarea '{db_task.description}' actualizado.",
                     duration=3000,
                 )
@@ -874,15 +908,17 @@ class ProjectState(rx.State):
     async def add_manual_log_entry(self, form_data: dict):
         action = form_data.get("action", "").strip()
         if not self.selected_project_id:
-            return rx.toast(
+            yield rx.toast(
                 "Ningún proyecto seleccionado.",
                 duration=3000,
             )
+            return
         if not action:
-            return rx.toast(
+            yield rx.toast(
                 "La acción de la bitácora no puede estar vacía.",
                 duration=3000,
             )
+            return
         with rx.session() as session:
             await self._add_log_entry_db(
                 session,
@@ -891,7 +927,8 @@ class ProjectState(rx.State):
             )
             session.commit()
         self.show_log_form_dialog = False
-        return rx.toast(
+        yield ProjectState.force_update
+        yield rx.toast(
             "Entrada manual de bitácora añadida.",
             duration=3000,
         )
@@ -977,6 +1014,7 @@ class ProjectState(rx.State):
     def _get_project_count_by_status(
         self, status: StatusType
     ) -> int:
+        _ = self.last_updated_timestamp
         with rx.session() as session:
             return (
                 session.exec(
@@ -989,6 +1027,7 @@ class ProjectState(rx.State):
 
     @rx.var
     def all_tasks(self) -> list[TaskType]:
+        _ = self.last_updated_timestamp
         with rx.session() as session:
             db_tasks = (
                 session.exec(sqlalchemy.select(DBTask))
@@ -1002,10 +1041,12 @@ class ProjectState(rx.State):
 
     @rx.var
     def total_tasks_count(self) -> int:
+        _ = self.last_updated_timestamp
         return len(self.all_tasks)
 
     @rx.var
     def tasks_por_hacer_count(self) -> int:
+        _ = self.last_updated_timestamp
         return len(
             [
                 t
@@ -1016,6 +1057,7 @@ class ProjectState(rx.State):
 
     @rx.var
     def tasks_en_progreso_count(self) -> int:
+        _ = self.last_updated_timestamp
         return len(
             [
                 t
@@ -1026,6 +1068,7 @@ class ProjectState(rx.State):
 
     @rx.var
     def tasks_hecho_count(self) -> int:
+        _ = self.last_updated_timestamp
         return len(
             [
                 t
@@ -1036,6 +1079,7 @@ class ProjectState(rx.State):
 
     @rx.var
     def total_projects_count(self) -> int:
+        _ = self.last_updated_timestamp
         with rx.session() as session:
             return (
                 session.exec(
@@ -1068,6 +1112,7 @@ class ProjectState(rx.State):
 
     @rx.var
     def projects_due_soon_count(self) -> int:
+        _ = self.last_updated_timestamp
         with rx.session() as session:
             today = datetime.date.today()
             due_soon_threshold = today + datetime.timedelta(
@@ -1090,6 +1135,7 @@ class ProjectState(rx.State):
 
     @rx.var
     def projects_overdue_count(self) -> int:
+        _ = self.last_updated_timestamp
         with rx.session() as session:
             today = datetime.date.today()
             return (
@@ -1107,6 +1153,7 @@ class ProjectState(rx.State):
     def project_status_distribution(
         self,
     ) -> list[dict[str, str | int]]:
+        _ = self.last_updated_timestamp
         colors = {
             "idea": "#3B82F6",
             "diseño": "#8B5CF6",
@@ -1133,6 +1180,7 @@ class ProjectState(rx.State):
     def projects_by_responsible_data(
         self,
     ) -> list[dict[str, Union[str, int]]]:
+        _ = self.last_updated_timestamp
         with rx.session() as session:
             results = session.exec(
                 sqlalchemy.select(
@@ -1163,6 +1211,7 @@ class ProjectState(rx.State):
     def projects_by_status_dashboard_data(
         self,
     ) -> list[dict[str, Union[str, int]]]:
+        _ = self.last_updated_timestamp
         query = sqlalchemy.select(
             DBProject.status,
             sqlalchemy.func.count(DBProject.id).label(
@@ -1230,6 +1279,7 @@ class ProjectState(rx.State):
     def task_status_distribution(
         self,
     ) -> list[dict[str, str | int]]:
+        _ = self.last_updated_timestamp
         colors = {
             "por hacer": "#A0AEC0",
             "en progreso": "#ECC94B",
