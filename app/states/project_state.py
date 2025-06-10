@@ -303,34 +303,14 @@ class ProjectState(rx.State):
         }
 
     @rx.var
-    def project_list(self) -> list[ProjectType]:
+    def all_projects(self) -> list[ProjectType]:
         with rx.session() as session:
-            query = sqlalchemy.select(DBProject)
-            if self.filter_status != "todos":
-                query = query.where(
-                    DBProject.status == self.filter_status
-                )
-            if self.filter_due_date:
-                try:
-                    filter_date_obj = (
-                        datetime.datetime.strptime(
-                            self.filter_due_date, "%Y-%m-%d"
-                        ).date()
-                    )
-                    query = query.where(
-                        DBProject.due_date
-                        <= filter_date_obj
-                    )
-                except ValueError:
-                    pass
-            if self.filter_responsible:
-                query = query.where(
-                    DBProject.responsible.ilike(
-                        f"%{self.filter_responsible}%"
-                    )
-                )
             db_projects = (
-                session.exec(query.order_by(DBProject.name))
+                session.exec(
+                    sqlalchemy.select(DBProject).order_by(
+                        DBProject.name
+                    )
+                )
                 .scalars()
                 .all()
             )
@@ -341,18 +321,48 @@ class ProjectState(rx.State):
 
     @rx.var
     def filtered_project_list(self) -> list[ProjectType]:
-        projects_from_db = self.project_list
-        if not self.search_term.strip():
-            return projects_from_db
-        search_lower = self.search_term.lower()
-        return [
-            p
-            for p in projects_from_db
-            if search_lower in p["name"].lower()
-            or search_lower in p["responsible"].lower()
-            or search_lower
-            in p.get("description", "").lower()
-        ]
+        projects_to_filter = self.all_projects
+        if self.filter_status != "todos":
+            projects_to_filter = [
+                p
+                for p in projects_to_filter
+                if p["status"] == self.filter_status
+            ]
+        if self.filter_due_date:
+            try:
+                filter_date_obj = (
+                    datetime.datetime.strptime(
+                        self.filter_due_date, "%Y-%m-%d"
+                    ).date()
+                )
+                projects_to_filter = [
+                    p
+                    for p in projects_to_filter
+                    if datetime.datetime.strptime(
+                        p["due_date"], "%Y-%m-%d"
+                    ).date()
+                    <= filter_date_obj
+                ]
+            except ValueError:
+                pass
+        if self.filter_responsible:
+            projects_to_filter = [
+                p
+                for p in projects_to_filter
+                if self.filter_responsible.lower()
+                in p["responsible"].lower()
+            ]
+        if self.search_term.strip():
+            search_lower = self.search_term.lower()
+            projects_to_filter = [
+                p
+                for p in projects_to_filter
+                if search_lower in p["name"].lower()
+                or search_lower in p["responsible"].lower()
+                or search_lower
+                in p.get("description", "").lower()
+            ]
+        return projects_to_filter
 
     @rx.var
     def selected_project(self) -> ProjectType | None:
@@ -1096,65 +1106,71 @@ class ProjectState(rx.State):
     def projects_by_status_dashboard_data(
         self,
     ) -> list[dict[str, Union[str, int]]]:
-        query = sqlalchemy.select(
-            DBProject.status,
-            sqlalchemy.func.count(DBProject.id).label(
-                "count"
-            ),
-        )
-        if self.dashboard_filter_project_status != "todos":
-            query = query.where(
-                DBProject.status
-                == self.dashboard_filter_project_status
-            )
-        query = query.group_by(DBProject.status).order_by(
-            DBProject.status
-        )
         with rx.session() as session:
-            results = session.exec(query).all()
-        data_to_return = []
-        if self.dashboard_filter_project_status == "todos":
-            status_counts = {
-                status: 0
-                for status in VALID_PROJECT_STATUSES
-            }
-            for status_db, count_db in results:
-                if status_db in status_counts:
-                    status_counts[status_db] = count_db
-            for (
-                status_val,
-                count_val,
-            ) in status_counts.items():
-                data_to_return.append(
-                    {
-                        "name": status_val.capitalize(),
-                        "count": count_val,
-                    }
-                )
-        else:
-            found = False
-            for status_db, count_db in results:
-                if (
-                    status_db
+            query = sqlalchemy.select(
+                DBProject.status,
+                sqlalchemy.func.count(DBProject.id).label(
+                    "count"
+                ),
+            )
+            if (
+                self.dashboard_filter_project_status
+                != "todos"
+            ):
+                query = query.where(
+                    DBProject.status
                     == self.dashboard_filter_project_status
+                )
+            query = query.group_by(
+                DBProject.status
+            ).order_by(DBProject.status)
+            results = session.exec(query).all()
+            data_to_return = []
+            if (
+                self.dashboard_filter_project_status
+                == "todos"
+            ):
+                status_counts = {
+                    status: 0
+                    for status in VALID_PROJECT_STATUSES
+                }
+                for status_db, count_db in results:
+                    if status_db in status_counts:
+                        status_counts[status_db] = count_db
+                for (
+                    status_val,
+                    count_val,
+                ) in status_counts.items():
+                    data_to_return.append(
+                        {
+                            "name": status_val.capitalize(),
+                            "count": count_val,
+                        }
+                    )
+            else:
+                found = False
+                for status_db, count_db in results:
+                    if (
+                        status_db
+                        == self.dashboard_filter_project_status
+                    ):
+                        data_to_return.append(
+                            {
+                                "name": status_db.capitalize(),
+                                "count": count_db,
+                            }
+                        )
+                        found = True
+                        break
+                if (
+                    not found
+                    and self.dashboard_filter_project_status
+                    in VALID_PROJECT_STATUSES
                 ):
                     data_to_return.append(
                         {
-                            "name": status_db.capitalize(),
-                            "count": count_db,
+                            "name": self.dashboard_filter_project_status.capitalize(),
+                            "count": 0,
                         }
                     )
-                    found = True
-                    break
-            if (
-                not found
-                and self.dashboard_filter_project_status
-                in VALID_PROJECT_STATUSES
-            ):
-                data_to_return.append(
-                    {
-                        "name": self.dashboard_filter_project_status.capitalize(),
-                        "count": 0,
-                    }
-                )
-        return data_to_return
+            return data_to_return
