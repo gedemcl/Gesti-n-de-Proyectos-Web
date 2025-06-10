@@ -21,8 +21,7 @@ class AuthState(rx.State):
     show_change_password_dialog: bool = False
     _initial_admin_created: bool = False
 
-    @rx.event
-    def on_load_create_admin_if_not_exists(self):
+    def _create_admin_if_not_exists(self):
         if self._initial_admin_created:
             return
         with rx.session() as session:
@@ -48,7 +47,7 @@ class AuthState(rx.State):
                 session.add(new_admin)
                 session.commit()
                 print("Initial admin user created.")
-            self._initial_admin_created = True
+        self._initial_admin_created = True
 
     def _is_valid_rut(self, rut: str) -> bool:
         rut_cleaned = (
@@ -85,6 +84,8 @@ class AuthState(rx.State):
 
     @rx.event
     def login(self, form_data: dict):
+        from app.states.project_state import ProjectState
+
         username_input = form_data.get("username", "")
         password_input = form_data.get("password", "")
         self.error_message = ""
@@ -96,6 +97,7 @@ class AuthState(rx.State):
                 duration=3000,
                 position="top-center",
             )
+        self._create_admin_if_not_exists()
         with rx.session() as session:
             user_db = (
                 session.exec(
@@ -125,7 +127,9 @@ class AuthState(rx.State):
                         duration=5000,
                         position="top-center",
                     )
-                return rx.redirect("/dashboard")
+                yield ProjectState.load_all_data
+                yield rx.redirect("/dashboard")
+                return
         self.error_message = "RUT o contraseña incorrectos."
         self.is_logged_in = False
         self.current_user_id = None
