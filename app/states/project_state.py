@@ -35,7 +35,7 @@ class ProjectState(rx.State):
     _initial_data_populated: bool = False
 
     @rx.event
-    async def on_load_populate_initial_data(self):
+    def on_load_populate_initial_data(self):
         if self._initial_data_populated:
             return
         with rx.session() as session:
@@ -52,7 +52,7 @@ class ProjectState(rx.State):
             in_a_week = today + datetime.timedelta(days=7)
             current_user_display_name = "Sistema"
             try:
-                auth_s = await self.get_state(AuthState)
+                auth_s = self.get_state_sync(AuthState)
                 if (
                     auth_s
                     and auth_s.current_user_display_name
@@ -196,9 +196,23 @@ class ProjectState(rx.State):
             "project_id", ""
         )
         if project_id_str.isdigit():
-            self.select_project(int(project_id_str))
+            project_id = int(project_id_str)
+            with rx.session() as session:
+                project_db = session.get(
+                    DBProject, project_id
+                )
+                if project_db:
+                    self.selected_project_id = project_id
+                else:
+                    self.selected_project_id = None
+                    yield rx.toast(
+                        "Proyecto no encontrado.",
+                        duration=3000,
+                        position="top-center",
+                    )
+                    yield rx.redirect("/proyectos")
         else:
-            self.select_project(None)
+            self.selected_project_id = None
             yield rx.toast(
                 "ID de proyecto inválido.",
                 duration=3000,
@@ -290,8 +304,6 @@ class ProjectState(rx.State):
 
     @rx.var
     def project_list(self) -> list[ProjectType]:
-        if not self._initial_data_populated:
-            return []
         with rx.session() as session:
             query = sqlalchemy.select(DBProject)
             if self.filter_status != "todos":
@@ -333,23 +345,14 @@ class ProjectState(rx.State):
         if not self.search_term.strip():
             return projects_from_db
         search_lower = self.search_term.lower()
-        filtered_list = []
-        for p in projects_from_db:
-            name_match = search_lower in p["name"].lower()
-            responsible_match = (
-                search_lower in p["responsible"].lower()
-            )
-            description_match = (
-                search_lower
-                in p.get("description", "").lower()
-            )
-            if (
-                name_match
-                or responsible_match
-                or description_match
-            ):
-                filtered_list.append(p)
-        return filtered_list
+        return [
+            p
+            for p in projects_from_db
+            if search_lower in p["name"].lower()
+            or search_lower in p["responsible"].lower()
+            or search_lower
+            in p.get("description", "").lower()
+        ]
 
     @rx.var
     def selected_project(self) -> ProjectType | None:
@@ -420,8 +423,6 @@ class ProjectState(rx.State):
 
     @rx.var
     def all_log_entries(self) -> list[LogEntryType]:
-        if not self._initial_data_populated:
-            return []
         with rx.session() as session:
             db_logs = (
                 session.exec(
@@ -444,8 +445,6 @@ class ProjectState(rx.State):
 
     @rx.var
     def filtered_log_entries(self) -> list[LogEntryType]:
-        if not self._initial_data_populated:
-            return []
         logs_query = sqlalchemy.select(DBLogEntry)
         if self.filter_log_project_status != "todos":
             project_ids_with_status = sqlalchemy.select(
@@ -684,13 +683,6 @@ class ProjectState(rx.State):
                     "Proyecto no encontrado para eliminar.",
                     duration=3000,
                 )
-
-    @rx.event
-    def select_project(self, project_id: int | None):
-        self.selected_project_id = project_id
-        self.show_task_form_dialog = False
-        self.editing_task_id = None
-        self.show_log_form_dialog = False
 
     @rx.event
     def toggle_task_form_dialog(
@@ -972,8 +964,6 @@ class ProjectState(rx.State):
     def _get_project_count_by_status(
         self, status: StatusType
     ) -> int:
-        if not self._initial_data_populated:
-            return 0
         with rx.session() as session:
             return (
                 session.exec(
@@ -986,8 +976,6 @@ class ProjectState(rx.State):
 
     @rx.var
     def total_projects_count(self) -> int:
-        if not self._initial_data_populated:
-            return 0
         with rx.session() as session:
             return (
                 session.exec(
@@ -1020,8 +1008,6 @@ class ProjectState(rx.State):
 
     @rx.var
     def projects_due_soon_count(self) -> int:
-        if not self._initial_data_populated:
-            return 0
         with rx.session() as session:
             today = datetime.date.today()
             due_soon_threshold = today + datetime.timedelta(
@@ -1044,8 +1030,6 @@ class ProjectState(rx.State):
 
     @rx.var
     def projects_overdue_count(self) -> int:
-        if not self._initial_data_populated:
-            return 0
         with rx.session() as session:
             today = datetime.date.today()
             return (
@@ -1063,8 +1047,6 @@ class ProjectState(rx.State):
     def project_status_distribution(
         self,
     ) -> list[dict[str, str | int]]:
-        if not self._initial_data_populated:
-            return []
         counts = {
             "idea": self.projects_idea_count,
             "diseño": self.projects_diseno_count,
@@ -1084,8 +1066,6 @@ class ProjectState(rx.State):
     def projects_by_responsible_data(
         self,
     ) -> list[dict[str, Union[str, int]]]:
-        if not self._initial_data_populated:
-            return []
         with rx.session() as session:
             results = session.exec(
                 sqlalchemy.select(
@@ -1116,8 +1096,6 @@ class ProjectState(rx.State):
     def projects_by_status_dashboard_data(
         self,
     ) -> list[dict[str, Union[str, int]]]:
-        if not self._initial_data_populated:
-            return []
         query = sqlalchemy.select(
             DBProject.status,
             sqlalchemy.func.count(DBProject.id).label(

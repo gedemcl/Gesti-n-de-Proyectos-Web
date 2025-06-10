@@ -11,33 +11,18 @@ import json
 class AuthState(rx.State):
     error_message: str = ""
     is_logged_in: bool = False
-    is_loading: bool = True
     current_user_id: int | None = None
     current_user_display_name: str = ""
     current_user_roles: list[str] = []
     show_add_user_dialog: bool = False
-    new_user_username: str = ""
-    new_user_email: str = ""
-    new_user_phone: str = ""
-    new_user_contact_info: str = ""
-    new_user_assign_admin_role: bool = False
-    new_user_assign_user_role: bool = True
     new_user_generated_password: str = ""
     filter_user_username: str = ""
     filter_user_role: str = "todos"
     show_change_password_dialog: bool = False
-    current_password_input: str = ""
-    new_password_input: str = ""
-    confirm_new_password_input: str = ""
     _initial_admin_created: bool = False
-    all_users: list[UserType] = []
 
     @rx.event
-    async def finish_loading(self):
-        self.is_loading = False
-
-    @rx.event
-    async def on_load_create_admin_if_not_exists(self):
+    def on_load_create_admin_if_not_exists(self):
         if self._initial_admin_created:
             return
         with rx.session() as session:
@@ -163,7 +148,7 @@ class AuthState(rx.State):
         return rx.redirect("/")
 
     @rx.event
-    async def check_login_status(self):
+    def check_login_status(self):
         if not self.is_logged_in:
             return rx.redirect("/")
         return None
@@ -178,12 +163,6 @@ class AuthState(rx.State):
             not self.show_add_user_dialog
         )
         if self.show_add_user_dialog:
-            self.new_user_username = ""
-            self.new_user_email = ""
-            self.new_user_phone = ""
-            self.new_user_contact_info = ""
-            self.new_user_assign_admin_role = False
-            self.new_user_assign_user_role = True
             self.new_user_generated_password = ""
 
     @rx.event
@@ -199,15 +178,11 @@ class AuthState(rx.State):
         contact_info = form_data.get(
             "new_user_contact_info", ""
         ).strip()
-        assign_admin = bool(
-            form_data.get(
-                "new_user_assign_admin_role", False
-            )
+        assign_admin = form_data.get(
+            "new_user_assign_admin_role", False
         )
-        assign_user = bool(
-            form_data.get(
-                "new_user_assign_user_role", False
-            )
+        assign_user = form_data.get(
+            "new_user_assign_user_role", True
         )
         if not username:
             return rx.toast(
@@ -240,21 +215,8 @@ class AuthState(rx.State):
             if assign_user:
                 roles_list.append("user")
             if not roles_list:
-                if self.new_user_assign_user_role:
-                    roles_list.append("user")
-                else:
-                    return rx.toast(
-                        "El usuario debe tener al menos un rol.",
-                        duration=3000,
-                    )
-            if (
-                "admin" in roles_list
-                and "user" not in roles_list
-            ):
-                pass
-            if not roles_list:
                 return rx.toast(
-                    "El usuario debe tener al menos un rol. Por defecto se asignará 'Usuario Estándar'.",
+                    "El usuario debe tener al menos un rol.",
                     duration=3000,
                 )
             password_chars = (
@@ -276,30 +238,11 @@ class AuthState(rx.State):
             new_db_user.roles = roles_list
             session.add(new_db_user)
             session.commit()
-            session.refresh(new_db_user)
-            self.all_users.append(
-                {
-                    "id": new_db_user.id,
-                    "username": new_db_user.username,
-                    "password": "",
-                    "roles": new_db_user.roles,
-                    "email": new_db_user.email,
-                    "phone": new_db_user.phone,
-                    "contact_info": new_db_user.contact_info,
-                    "temp_password": new_db_user.temp_password,
-                }
-            )
         self.new_user_generated_password = (
-            f"Contraseña Temporal: {generated_password}"
+            generated_password
         )
-        self.new_user_username = ""
-        self.new_user_email = ""
-        self.new_user_phone = ""
-        self.new_user_contact_info = ""
-        self.new_user_assign_admin_role = False
-        self.new_user_assign_user_role = True
         return rx.toast(
-            f"Usuario con RUT '{username}' creado con contraseña temporal.",
+            f"Usuario con RUT '{username}' creado.",
             duration=5000,
         )
 
@@ -318,55 +261,49 @@ class AuthState(rx.State):
             return
         return
 
-    @rx.event
-    def load_users(self):
-        """Load users from the database."""
+    @rx.var
+    def filtered_users(self) -> list[UserType]:
         with rx.session() as session:
-            db_users = (
-                session.exec(
-                    sqlalchemy.select(DBUser).order_by(
-                        DBUser.username
+            query = sqlalchemy.select(DBUser)
+            current_filter_username_val = (
+                self.filter_user_username
+            )
+            current_filter_role_val = self.filter_user_role
+            if current_filter_username_val:
+                query = query.where(
+                    DBUser.username.ilike(
+                        f"%{current_filter_username_val}%"
                     )
+                )
+            db_users_result = (
+                session.exec(
+                    query.order_by(DBUser.username)
                 )
                 .scalars()
                 .all()
             )
-            self.all_users = [
-                {
-                    "id": db_user.id,
-                    "username": db_user.username,
-                    "password": "",
-                    "roles": db_user.roles,
-                    "email": db_user.email,
-                    "phone": db_user.phone,
-                    "contact_info": db_user.contact_info,
-                    "temp_password": db_user.temp_password,
-                }
-                for db_user in db_users
-            ]
-
-    @rx.var
-    def filtered_users(self) -> list[UserType]:
-        users_to_filter = self.all_users
-        filtered_users_list = []
-        for user in users_to_filter:
-            username_match = True
-            if self.filter_user_username:
+            processed_users: list[UserType] = []
+            for db_user in db_users_result:
+                user_roles = db_user.roles
                 if (
-                    self.filter_user_username.lower()
-                    not in user["username"].lower()
+                    current_filter_role_val != "todos"
+                    and current_filter_role_val
+                    not in user_roles
                 ):
-                    username_match = False
-            role_match = True
-            if self.filter_user_role != "todos":
-                if (
-                    self.filter_user_role
-                    not in user["roles"]
-                ):
-                    role_match = False
-            if username_match and role_match:
-                filtered_users_list.append(user)
-        return filtered_users_list
+                    continue
+                processed_users.append(
+                    {
+                        "id": db_user.id,
+                        "username": db_user.username,
+                        "password": "",
+                        "roles": user_roles,
+                        "email": db_user.email,
+                        "phone": db_user.phone,
+                        "contact_info": db_user.contact_info,
+                        "temp_password": db_user.temp_password,
+                    }
+                )
+            return processed_users
 
     def set_filter_user_username(self, username: str):
         self.filter_user_username = username.strip()
@@ -380,9 +317,6 @@ class AuthState(rx.State):
             not self.show_change_password_dialog
         )
         if self.show_change_password_dialog:
-            self.current_password_input = ""
-            self.new_password_input = ""
-            self.confirm_new_password_input = ""
             self.error_message = ""
 
     @rx.event
@@ -440,38 +374,8 @@ class AuthState(rx.State):
             session.add(user_to_update)
             session.commit()
         self.show_change_password_dialog = False
-        self.current_password_input = ""
-        self.new_password_input = ""
-        self.confirm_new_password_input = ""
         return rx.toast(
             "Contraseña actualizada exitosamente.",
             duration=3000,
             position="top-center",
         )
-
-    def set_new_user_username(self, value: str):
-        self.new_user_username = value
-
-    def set_new_user_email(self, value: str):
-        self.new_user_email = value
-
-    def set_new_user_phone(self, value: str):
-        self.new_user_phone = value
-
-    def set_new_user_contact_info(self, value: str):
-        self.new_user_contact_info = value
-
-    def set_new_user_assign_admin_role(self, value: bool):
-        self.new_user_assign_admin_role = value
-
-    def set_new_user_assign_user_role(self, value: bool):
-        self.new_user_assign_user_role = value
-
-    def set_current_password_input(self, value: str):
-        self.current_password_input = value
-
-    def set_new_password_input(self, value: str):
-        self.new_password_input = value
-
-    def set_confirm_new_password_input(self, value: str):
-        self.confirm_new_password_input = value
