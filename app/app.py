@@ -35,6 +35,13 @@ app = rx.App(
     stylesheets=[
         "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
     ],
+    head_components=[
+        rx.el.link(
+            rel="icon",
+            href="/arica_professional_logo.png",
+            type="image/png",
+        )
+    ],
 )
 app.add_page(
     index,

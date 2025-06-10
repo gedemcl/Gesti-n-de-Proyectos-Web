@@ -70,7 +70,7 @@ def login_page() -> rx.Component:
             ),
             rx.el.div(
                 rx.el.image(
-                    src="/professional_logo_ilustre.png",
+                    src="/arica_professional_logo.png",
                     alt="Logo Municipalidad de Arica",
                     class_name="w-40 h-auto md:w-48 object-contain mx-auto",
                 ),

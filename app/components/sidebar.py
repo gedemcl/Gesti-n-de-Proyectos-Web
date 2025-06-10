@@ -20,7 +20,7 @@ def sidebar() -> rx.Component:
         rx.el.div(
             rx.el.div(
                 rx.el.image(
-                    src="/professional_logo_ilustre.png",
+                    src="/arica_professional_logo.png",
                     alt="Logo Municipalidad de Arica",
                     class_name="h-16 w-auto mx-auto mt-4 mb-2",
                 ),
