@@ -118,7 +118,6 @@ class ProjectState(rx.State):
                 "description": "Coordinación completa del evento anual de la municipalidad.",
             }
             db_project5 = DBProject(**project5_data)
-            session.add(db_project5)
             session.flush()
             task1_data = {
                 "project_id": db_project1.id,
@@ -321,48 +320,67 @@ class ProjectState(rx.State):
 
     @rx.var
     def filtered_project_list(self) -> list[ProjectType]:
-        projects_to_filter = self.all_projects
-        if self.filter_status != "todos":
-            projects_to_filter = [
-                p
-                for p in projects_to_filter
-                if p["status"] == self.filter_status
-            ]
-        if self.filter_due_date:
-            try:
-                filter_date_obj = (
-                    datetime.datetime.strptime(
-                        self.filter_due_date, "%Y-%m-%d"
-                    ).date()
+        with rx.session() as session:
+            query = sqlalchemy.select(DBProject)
+            current_filter_status = self.filter_status
+            if current_filter_status != "todos":
+                query = query.where(
+                    DBProject.status
+                    == current_filter_status
                 )
-                projects_to_filter = [
-                    p
-                    for p in projects_to_filter
-                    if datetime.datetime.strptime(
-                        p["due_date"], "%Y-%m-%d"
-                    ).date()
-                    <= filter_date_obj
-                ]
-            except ValueError:
-                pass
-        if self.filter_responsible:
-            projects_to_filter = [
-                p
-                for p in projects_to_filter
-                if self.filter_responsible.lower()
-                in p["responsible"].lower()
+            current_filter_due_date = self.filter_due_date
+            if current_filter_due_date:
+                try:
+                    filter_date_obj = (
+                        datetime.datetime.strptime(
+                            current_filter_due_date,
+                            "%Y-%m-%d",
+                        ).date()
+                    )
+                    query = query.where(
+                        DBProject.due_date
+                        <= filter_date_obj
+                    )
+                except ValueError:
+                    pass
+            current_filter_responsible = (
+                self.filter_responsible
+            )
+            if current_filter_responsible:
+                query = query.where(
+                    DBProject.responsible.ilike(
+                        f"%{current_filter_responsible}%"
+                    )
+                )
+            current_search_term = self.search_term.strip()
+            if current_search_term:
+                search_lower = current_search_term.lower()
+                query = query.where(
+                    sqlalchemy.or_(
+                        DBProject.name.ilike(
+                            f"%{search_lower}%"
+                        ),
+                        DBProject.responsible.ilike(
+                            f"%{search_lower}%"
+                        ),
+                        DBProject.description.ilike(
+                            f"%{search_lower}%"
+                        ),
+                    )
+                )
+            db_projects = (
+                session.exec(
+                    query.order_by(
+                        DBProject.due_date.desc()
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            return [
+                self._map_dbproject_to_projecttype(p)
+                for p in db_projects
             ]
-        if self.search_term.strip():
-            search_lower = self.search_term.lower()
-            projects_to_filter = [
-                p
-                for p in projects_to_filter
-                if search_lower in p["name"].lower()
-                or search_lower in p["responsible"].lower()
-                or search_lower
-                in p.get("description", "").lower()
-            ]
-        return projects_to_filter
 
     @rx.var
     def selected_project(self) -> ProjectType | None:
@@ -455,26 +473,32 @@ class ProjectState(rx.State):
 
     @rx.var
     def filtered_log_entries(self) -> list[LogEntryType]:
-        logs_query = sqlalchemy.select(DBLogEntry)
-        if self.filter_log_project_status != "todos":
-            project_ids_with_status = sqlalchemy.select(
-                DBProject.id
-            ).where(
-                DBProject.status
-                == self.filter_log_project_status
-            )
-            logs_query = logs_query.where(
-                DBLogEntry.project_id.in_(
-                    project_ids_with_status
-                )
-            )
-        if self.filter_log_action_text:
-            logs_query = logs_query.where(
-                DBLogEntry.action.ilike(
-                    f"%{self.filter_log_action_text}%"
-                )
-            )
         with rx.session() as session:
+            logs_query = sqlalchemy.select(DBLogEntry)
+            current_filter_log_project_status = (
+                self.filter_log_project_status
+            )
+            if current_filter_log_project_status != "todos":
+                project_ids_with_status = sqlalchemy.select(
+                    DBProject.id
+                ).where(
+                    DBProject.status
+                    == current_filter_log_project_status
+                )
+                logs_query = logs_query.where(
+                    DBLogEntry.project_id.in_(
+                        project_ids_with_status
+                    )
+                )
+            current_filter_log_action_text = (
+                self.filter_log_action_text
+            )
+            if current_filter_log_action_text:
+                logs_query = logs_query.where(
+                    DBLogEntry.action.ilike(
+                        f"%{current_filter_log_action_text}%"
+                    )
+                )
             db_logs = (
                 session.exec(
                     logs_query.order_by(
@@ -1113,13 +1137,16 @@ class ProjectState(rx.State):
                     "count"
                 ),
             )
-            if (
+            current_dashboard_filter_project_status = (
                 self.dashboard_filter_project_status
+            )
+            if (
+                current_dashboard_filter_project_status
                 != "todos"
             ):
                 query = query.where(
                     DBProject.status
-                    == self.dashboard_filter_project_status
+                    == current_dashboard_filter_project_status
                 )
             query = query.group_by(
                 DBProject.status
@@ -1127,7 +1154,7 @@ class ProjectState(rx.State):
             results = session.exec(query).all()
             data_to_return = []
             if (
-                self.dashboard_filter_project_status
+                current_dashboard_filter_project_status
                 == "todos"
             ):
                 status_counts = {
@@ -1152,7 +1179,7 @@ class ProjectState(rx.State):
                 for status_db, count_db in results:
                     if (
                         status_db
-                        == self.dashboard_filter_project_status
+                        == current_dashboard_filter_project_status
                     ):
                         data_to_return.append(
                             {
@@ -1164,12 +1191,12 @@ class ProjectState(rx.State):
                         break
                 if (
                     not found
-                    and self.dashboard_filter_project_status
+                    and current_dashboard_filter_project_status
                     in VALID_PROJECT_STATUSES
                 ):
                     data_to_return.append(
                         {
-                            "name": self.dashboard_filter_project_status.capitalize(),
+                            "name": current_dashboard_filter_project_status.capitalize(),
                             "count": 0,
                         }
                     )
