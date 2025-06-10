@@ -48,8 +48,6 @@ app.add_page(
     dashboard_page,
     route="/dashboard",
     on_load=[
-        AuthState.on_load_create_admin_if_not_exists,
-        ProjectState.on_load_populate_initial_data,
         AuthState.check_login_status,
         ProjectState.on_load,
     ],
@@ -59,8 +57,6 @@ app.add_page(
     proyectos_page,
     route="/proyectos",
     on_load=[
-        AuthState.on_load_create_admin_if_not_exists,
-        ProjectState.on_load_populate_initial_data,
         AuthState.check_login_status,
         ProjectState.on_load,
     ],
@@ -70,8 +66,6 @@ app.add_page(
     proyecto_detail_page,
     route="/proyectos/[project_id]",
     on_load=[
-        AuthState.on_load_create_admin_if_not_exists,
-        ProjectState.on_load_populate_initial_data,
         AuthState.check_login_status,
         ProjectState.load_project_for_detail_page,
     ],
@@ -81,8 +75,6 @@ app.add_page(
     bitacora_page,
     route="/bitacora",
     on_load=[
-        AuthState.on_load_create_admin_if_not_exists,
-        ProjectState.on_load_populate_initial_data,
         AuthState.check_login_status,
         ProjectState.on_load,
     ],
@@ -92,8 +84,6 @@ app.add_page(
     admin_page,
     route="/admin",
     on_load=[
-        AuthState.on_load_create_admin_if_not_exists,
-        ProjectState.on_load_populate_initial_data,
         AuthState.check_login_status,
         AuthState.specific_admin_check,
         ProjectState.on_load,
@@ -104,8 +94,6 @@ app.add_page(
     ayuda_page,
     route="/ayuda",
     on_load=[
-        AuthState.on_load_create_admin_if_not_exists,
-        ProjectState.on_load_populate_initial_data,
         AuthState.check_login_status,
         ProjectState.on_load,
     ],
