@@ -38,7 +38,6 @@ class ProjectState(rx.State):
     async def on_load_populate_initial_data(self):
         if self._initial_data_populated:
             return
-        rx.Model.create_all()
         with rx.session() as session:
             if (
                 session.exec(sqlalchemy.select(DBProject))
