@@ -10,16 +10,6 @@ from app.pages.admin_page import admin_page
 from app.pages.ayuda_page import ayuda_page
 from app.states.auth_state import AuthState
 from app.states.project_state import ProjectState
-from app.db_models import (
-    DBUser,
-    DBProject,
-    DBTask,
-    DBLogEntry,
-    DBProjectCategory,
-)
-
-rx.Model.create_all()
-engine = rx.model.get_engine()
 
 
 def index() -> rx.Component:
