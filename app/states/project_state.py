@@ -35,6 +35,8 @@ class ProjectState(rx.State):
     filter_log_project_status: str = "todos"
     filter_log_action_text: str = ""
     dashboard_filter_project_status: str = "todos"
+    filter_is_due_soon: bool = False
+    filter_is_overdue: bool = False
     _initial_data_populated: bool = False
 
     def _populate_initial_data_if_needed(self):
@@ -374,6 +376,14 @@ class ProjectState(rx.State):
                 if search_lower in p["name"].lower()
                 or search_lower in p["responsible"].lower()
                 or search_lower in p["description"].lower()
+            ]
+        if self.filter_is_due_soon:
+            projects = [
+                p for p in projects if p["is_due_soon"]
+            ]
+        if self.filter_is_overdue:
+            projects = [
+                p for p in projects if p["is_overdue"]
             ]
         return sorted(
             projects,
@@ -939,6 +949,16 @@ class ProjectState(rx.State):
         self.filter_due_date = ""
         self.filter_responsible = ""
         self.search_term = ""
+        self.filter_is_due_soon = False
+        self.filter_is_overdue = False
+
+    @rx.event
+    def set_filter_is_due_soon(self, is_checked: bool):
+        self.filter_is_due_soon = is_checked
+
+    @rx.event
+    def set_filter_is_overdue(self, is_checked: bool):
+        self.filter_is_overdue = is_checked
 
     @rx.event
     def set_filter_log_project_status(self, status: str):
@@ -1033,6 +1053,7 @@ class ProjectState(rx.State):
             {
                 "name": status.capitalize(),
                 "value": count_val,
+                "status_key": status,
             }
             for status, count_val in counts.items()
             if count_val > 0
@@ -1082,6 +1103,7 @@ class ProjectState(rx.State):
                     {
                         "name": status_val.capitalize(),
                         "count": count_val,
+                        "status_key": status_val,
                     }
                 )
         else:
@@ -1097,6 +1119,48 @@ class ProjectState(rx.State):
                 {
                     "name": current_dashboard_filter_project_status.capitalize(),
                     "count": count,
+                    "status_key": current_dashboard_filter_project_status,
                 }
             )
         return data_to_return
+
+    @rx.event
+    def navigate_to_projects_with_filter(
+        self, filter_type: str, filter_value: str
+    ):
+        self.clear_filters()
+        if filter_type == "status":
+            self.filter_status = filter_value
+        elif filter_type == "responsible":
+            self.filter_responsible = filter_value
+        elif filter_type == "due_soon":
+            self.filter_is_due_soon = True
+        elif filter_type == "overdue":
+            self.filter_is_overdue = True
+        return rx.redirect("/proyectos")
+
+    @rx.event
+    def handle_responsible_chart_click(self, data: dict):
+        if (
+            data
+            and data.get("payload")
+            and data["payload"].get("name")
+        ):
+            responsible_name = data["payload"]["name"]
+            return ProjectState.navigate_to_projects_with_filter(
+                "responsible", responsible_name
+            )
+        return rx.toast("No se pudo aplicar el filtro.")
+
+    @rx.event
+    def handle_status_chart_click(self, data: dict):
+        if (
+            data
+            and data.get("payload")
+            and data["payload"].get("status_key")
+        ):
+            status_key = data["payload"]["status_key"]
+            return ProjectState.navigate_to_projects_with_filter(
+                "status", status_key
+            )
+        return rx.toast("No se pudo aplicar el filtro.")

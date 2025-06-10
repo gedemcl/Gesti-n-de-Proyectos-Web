@@ -6,7 +6,11 @@ from app.constants import RECHARTS_TOOLTIP_STYLE_CLASS_NAME
 
 
 def status_summary_card(
-    status: str, count: rx.Var[int] | int, color_class: str
+    status: str,
+    count: rx.Var[int] | int,
+    color_class: str,
+    filter_type: str,
+    filter_value: str,
 ) -> rx.Component:
     return rx.el.div(
         rx.el.h3(
@@ -17,7 +21,10 @@ def status_summary_card(
             count.to_string(),
             class_name=f"text-4xl font-bold {color_class}",
         ),
-        class_name="bg-white p-6 rounded-lg shadow-md text-center",
+        class_name="bg-white p-6 rounded-lg shadow-md text-center hover:shadow-lg transition-shadow cursor-pointer",
+        on_click=lambda: ProjectState.navigate_to_projects_with_filter(
+            filter_type, filter_value
+        ),
     )
 
 
@@ -32,38 +39,52 @@ def dashboard_content() -> rx.Component:
                 "Total Proyectos",
                 ProjectState.total_projects_count,
                 "text-indigo-600",
+                "status",
+                "todos",
             ),
             status_summary_card(
                 "En Idea",
                 ProjectState.projects_idea_count,
                 "text-blue-500",
+                "status",
+                "idea",
             ),
             status_summary_card(
                 "En Diseño",
                 ProjectState.projects_diseno_count,
                 "text-purple-500",
+                "status",
+                "diseño",
             ),
             status_summary_card(
                 "En Ejecución",
                 ProjectState.projects_ejecucion_count,
                 "text-yellow-500",
+                "status",
+                "ejecución",
             ),
             status_summary_card(
                 "Finalizados",
                 ProjectState.projects_finalizado_count,
                 "text-green-500",
+                "status",
+                "finalizado",
             ),
             status_summary_card(
                 "Vencen Pronto (<7 días)",
                 ProjectState.projects_due_soon_count,
                 "text-orange-500",
+                "due_soon",
+                "true",
             ),
             status_summary_card(
                 "Vencidos",
                 ProjectState.projects_overdue_count,
                 "text-red-600",
+                "overdue",
+                "true",
             ),
-            class_name="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8",
+            class_name="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8",
         ),
         rx.el.div(
             rx.el.div(
@@ -107,6 +128,10 @@ def dashboard_content() -> rx.Component:
                         fill="#005BBB",
                         radius=[4, 4, 0, 0],
                         name="Proyectos",
+                        on_click=lambda data: ProjectState.handle_responsible_chart_click(
+                            data
+                        ),
+                        class_name="cursor-pointer",
                     ),
                     rx.recharts.legend(
                         height=0,
@@ -187,6 +212,10 @@ def dashboard_content() -> rx.Component:
                         fill="#FFC107",
                         radius=[4, 4, 0, 0],
                         name="Proyectos",
+                        on_click=lambda data: ProjectState.handle_status_chart_click(
+                            data
+                        ),
+                        class_name="cursor-pointer",
                     ),
                     rx.recharts.legend(
                         height=0,
@@ -221,7 +250,6 @@ def dashboard_content() -> rx.Component:
                         class_name=RECHARTS_TOOLTIP_STYLE_CLASS_NAME
                     ),
                     rx.recharts.pie(
-                        data=ProjectState.project_status_distribution,
                         data_key="value",
                         name_key="name",
                         cx="50%",
@@ -229,10 +257,15 @@ def dashboard_content() -> rx.Component:
                         outer_radius=100,
                         fill="#8884d8",
                         label=True,
+                        on_click=lambda data: ProjectState.handle_status_chart_click(
+                            data
+                        ),
+                        class_name="cursor-pointer",
                     ),
                     rx.recharts.legend(
                         icon_size=10, icon_type="square"
                     ),
+                    data=ProjectState.project_status_distribution,
                     width="100%",
                     height=350,
                 ),

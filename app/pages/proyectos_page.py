@@ -61,12 +61,42 @@ def project_filters() -> rx.Component:
             ),
             class_name="flex items-center",
         ),
+        rx.el.div(
+            rx.el.div(
+                rx.el.input(
+                    type="checkbox",
+                    id="due_soon_filter",
+                    checked=ProjectState.filter_is_due_soon,
+                    on_change=ProjectState.set_filter_is_due_soon,
+                    class_name="mr-2",
+                ),
+                rx.el.label(
+                    "Vence Pronto",
+                    html_for="due_soon_filter",
+                ),
+                class_name="flex items-center",
+            ),
+            rx.el.div(
+                rx.el.input(
+                    type="checkbox",
+                    id="overdue_filter",
+                    checked=ProjectState.filter_is_overdue,
+                    on_change=ProjectState.set_filter_is_overdue,
+                    class_name="mr-2",
+                ),
+                rx.el.label(
+                    "Vencido", html_for="overdue_filter"
+                ),
+                class_name="flex items-center",
+            ),
+            class_name="flex items-center space-x-4",
+        ),
         rx.el.button(
             "Limpiar Filtros",
             on_click=ProjectState.clear_filters,
             class_name="px-3 py-2 bg-gray-200 text-gray-700 font-semibold rounded-md hover:bg-gray-300 transition-colors text-sm",
         ),
-        class_name="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 border-y border-gray-200 bg-gray-50 items-end",
+        class_name="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 p-4 border-y border-gray-200 bg-gray-50 items-end",
     )
 
 
