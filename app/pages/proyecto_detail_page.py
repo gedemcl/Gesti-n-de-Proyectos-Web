@@ -90,16 +90,6 @@ def proyecto_detail_page_content() -> rx.Component:
                             f"Responsable: {ProjectState.selected_project['responsible']}",
                             class_name="text-md text-gray-700 mb-1",
                         ),
-                        rx.el.p(
-                            "Temática: ",
-                            rx.el.span(
-                                ProjectState.selected_project[
-                                    "category_name"
-                                ],
-                                class_name="font-semibold",
-                            ),
-                            class_name="text-md text-gray-700 mb-1",
-                        ),
                         rx.el.div(
                             rx.el.span("Estado: "),
                             rx.el.span(

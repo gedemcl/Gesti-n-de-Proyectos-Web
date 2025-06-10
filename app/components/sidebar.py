@@ -20,7 +20,7 @@ def sidebar() -> rx.Component:
         rx.el.div(
             rx.el.div(
                 rx.el.image(
-                    src="/arica_professional_logo.png",
+                    src="/professional_logo_ilustre.png",
                     alt="Logo Municipalidad de Arica",
                     class_name="h-16 w-auto mx-auto mt-4 mb-2",
                 ),
@@ -77,9 +77,5 @@ def sidebar() -> rx.Component:
             ),
             class_name="flex flex-col h-full bg-white shadow-lg",
         ),
-        class_name=rx.cond(
-            AuthState.sidebar_open,
-            "fixed top-0 left-0 z-30 w-64 h-screen bg-white border-r border-gray-200 transition-transform duration-300 ease-in-out lg:translate-x-0 translate-x-0",
-            "fixed top-0 left-0 z-30 w-64 h-screen bg-white border-r border-gray-200 transition-transform duration-300 ease-in-out lg:translate-x-0 -translate-x-full",
-        ),
+        class_name="w-64 h-screen fixed top-0 left-0 z-20 bg-white border-r border-gray-200",
     )

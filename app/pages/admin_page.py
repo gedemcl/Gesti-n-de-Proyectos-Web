@@ -107,6 +107,7 @@ def admin_page_content() -> rx.Component:
             class_name="overflow-x-auto",
         ),
         class_name="p-6",
+        on_mount=AuthState.load_users,
     )
 
 

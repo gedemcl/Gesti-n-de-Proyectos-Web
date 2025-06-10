@@ -8,21 +8,14 @@ from app.models import (
     VALID_PRIORITIES,
     VALID_STATUSES,
     VALID_PROJECT_STATUSES,
-    ProjectCategory,
 )
-from app.db_models import (
-    DBProject,
-    DBTask,
-    DBLogEntry,
-    DBProjectCategory,
-)
+from app.db_models import DBProject, DBTask, DBLogEntry
 from typing import cast, Union
 import datetime
 from dateutil.parser import isoparse
 from app.states.auth_state import AuthState
 from collections import Counter
 import sqlalchemy
-import time
 
 
 class ProjectState(rx.State):
@@ -40,12 +33,12 @@ class ProjectState(rx.State):
     filter_log_action_text: str = ""
     dashboard_filter_project_status: str = "todos"
     _initial_data_populated: bool = False
-    last_updated_timestamp: float = 0.0
 
     @rx.event
-    def on_load_populate_initial_data(self):
+    async def on_load_populate_initial_data(self):
         if self._initial_data_populated:
             return
+        rx.Model.create_all()
         with rx.session() as session:
             if (
                 session.exec(sqlalchemy.select(DBProject))
@@ -53,222 +46,150 @@ class ProjectState(rx.State):
                 .first()
             ):
                 self._initial_data_populated = True
-                self.last_updated_timestamp = time.time()
                 return
-            categories_to_create = [
-                "Solicitudes varias",
-                "SEIM",
-                "RESALTOS",
-                "paraderos provisorios",
-                "Proyectos",
-                "Demarcaciones",
-                "Cierre de Pasajes",
-                "Señales Transitorias",
-                "SCAT",
-                "Estacionamientos Reservados",
-            ]
-            category_map = {}
-            for cat_name in categories_to_create:
-                existing_cat = (
-                    session.exec(
-                        sqlalchemy.select(
-                            DBProjectCategory
-                        ).where(
-                            DBProjectCategory.name
-                            == cat_name
-                        )
+            today = datetime.date.today()
+            tomorrow = today + datetime.timedelta(days=1)
+            yesterday = today - datetime.timedelta(days=1)
+            in_a_week = today + datetime.timedelta(days=7)
+            current_user_display_name = "Sistema"
+            try:
+                auth_s = await self.get_state(AuthState)
+                if (
+                    auth_s
+                    and auth_s.current_user_display_name
+                ):
+                    current_user_display_name = (
+                        auth_s.current_user_display_name
                     )
-                    .scalars()
-                    .first()
+            except Exception:
+                print(
+                    "Warning: AuthState not available during initial data population. Using default user 'Sistema'."
                 )
-                if not existing_cat:
-                    new_cat = DBProjectCategory(
-                        name=cat_name
-                    )
-                    session.add(new_cat)
-                    session.flush()
-                    category_map[cat_name] = new_cat
-                else:
-                    category_map[cat_name] = existing_cat
+            project1_data = {
+                "name": "Rediseño Sitio Web Principal",
+                "responsible": "Alicia Pérez",
+                "start_date": today
+                - datetime.timedelta(days=10),
+                "due_date": tomorrow,
+                "status": "ejecución",
+                "description": "Actualización completa de la plataforma web municipal.",
+            }
+            db_project1 = DBProject(**project1_data)
+            session.add(db_project1)
+            project2_data = {
+                "name": "Desarrollo App Móvil Cliente VIP",
+                "responsible": "Roberto García",
+                "start_date": today
+                - datetime.timedelta(days=30),
+                "due_date": yesterday,
+                "status": "diseño",
+                "description": "Aplicación móvil para mejorar la comunicación con ciudadanos destacados.",
+            }
+            db_project2 = DBProject(**project2_data)
+            session.add(db_project2)
+            project3_data = {
+                "name": "Campaña Marketing Q4",
+                "responsible": "Laura Gómez",
+                "start_date": today,
+                "due_date": in_a_week,
+                "status": "idea",
+                "description": "Planificación y ejecución de la campaña de marketing para el último trimestre.",
+            }
+            db_project3 = DBProject(**project3_data)
+            session.add(db_project3)
+            project4_data = {
+                "name": "Implementación Nuevo CRM",
+                "responsible": "Alicia Pérez",
+                "start_date": today
+                - datetime.timedelta(days=5),
+                "due_date": today
+                + datetime.timedelta(days=20),
+                "status": "ejecución",
+                "description": "Migración e implementación del nuevo sistema CRM.",
+            }
+            db_project4 = DBProject(**project4_data)
+            session.add(db_project4)
+            project5_data = {
+                "name": "Organización Evento Anual",
+                "responsible": "Roberto García",
+                "start_date": today,
+                "due_date": today
+                + datetime.timedelta(days=45),
+                "status": "finalizado",
+                "description": "Coordinación completa del evento anual de la municipalidad.",
+            }
+            db_project5 = DBProject(**project5_data)
+            session.add(db_project5)
+            session.flush()
+            task1_data = {
+                "project_id": db_project1.id,
+                "description": "Diseñar mockups iniciales UX",
+                "due_date": today,
+                "status": "por hacer",
+                "priority": "alta",
+            }
+            session.add(DBTask(**task1_data))
+            task2_data = {
+                "project_id": db_project1.id,
+                "description": "Desarrollar prototipo de homepage interactivo",
+                "due_date": tomorrow,
+                "status": "en progreso",
+                "priority": "crítica",
+            }
+            session.add(DBTask(**task2_data))
+            task3_data = {
+                "project_id": db_project2.id,
+                "description": "Configurar servicios backend y base de datos",
+                "due_date": today
+                - datetime.timedelta(days=5),
+                "status": "hecho",
+                "priority": "media",
+            }
+            session.add(DBTask(**task3_data))
+            task4_data = {
+                "project_id": db_project3.id,
+                "description": "Definir KPIs de campaña",
+                "due_date": today
+                + datetime.timedelta(days=6),
+                "status": "por hacer",
+                "priority": "alta",
+            }
+            session.add(DBTask(**task4_data))
+            log1_data = {
+                "project_id": db_project1.id,
+                "action": "Proyecto 'Rediseño Sitio Web Principal' creado",
+                "user": current_user_display_name,
+            }
+            session.add(DBLogEntry(**log1_data))
+            log2_data = {
+                "project_id": db_project2.id,
+                "action": "Proyecto 'Desarrollo App Móvil Cliente VIP' creado",
+                "user": current_user_display_name,
+            }
+            session.add(DBLogEntry(**log2_data))
+            log3_data = {
+                "project_id": db_project3.id,
+                "action": "Proyecto 'Campaña Marketing Q4' creado",
+                "user": current_user_display_name,
+            }
+            session.add(DBLogEntry(**log3_data))
+            log4_data = {
+                "project_id": db_project1.id,
+                "action": "Tarea 'Diseñar mockups iniciales UX' añadida al proyecto 'Rediseño Sitio Web Principal'",
+                "user": current_user_display_name,
+            }
+            session.add(DBLogEntry(**log4_data))
+            log5_data = {
+                "project_id": None,
+                "action": "Usuario '17011128-1' inició sesión.",
+                "user": "17011128-1",
+            }
+            session.add(DBLogEntry(**log5_data))
             session.commit()
-            excel_data = [
-                {
-                    "Tarea": "Enviar Obs a nuevo recorrido Prov 1704",
-                    "Propietario": "Luis Contreras",
-                    "Estado": "Completada",
-                    "Fecha de inicio": "04/03/2025",
-                    "Fecha de finalización": "",
-                    "Hito": "Hito",
-                    "Category": "Solicitudes varias",
-                },
-                {
-                    "Tarea": "Considerar Licencias digitales en Plan anual de Compras",
-                    "Propietario": "Luis Contreras",
-                    "Estado": "Completada",
-                    "Fecha de inicio": "04/03/2025",
-                    "Fecha de finalización": "04/03/2025",
-                    "Hito": "Creación del proyecto de implementación de Licencias digitales",
-                    "Category": "Solicitudes varias",
-                },
-                {
-                    "Tarea": "Informe de Carabineros por hoyos en aceras",
-                    "Propietario": "Luis Contreras",
-                    "Estado": "Completada",
-                    "Fecha de inicio": "19/02/2025",
-                    "Fecha de finalización": "11/03/2025",
-                    "Hito": "Se enviaron Ord a DIMAO (115) DOM(111)",
-                    "Category": "SEIM",
-                },
-                {
-                    "Tarea": "Lomillos",
-                    "Propietario": "Luis Contreras",
-                    "Estado": "En curso",
-                    "Fecha de inicio": "13/01/2025",
-                    "Fecha de finalización": "20/02/2025",
-                    "Hito": "Conversar con Administrador para ver si desean continuar con Programa",
-                    "Category": "SEIM",
-                },
-                {
-                    "Tarea": "Informe tecnico Bremen entre Chapiquiña y Baden",
-                    "Propietario": "Luis Contreras",
-                    "Estado": "Completada",
-                    "Fecha de inicio": "05/02/2025",
-                    "Fecha de finalización": "11/03/2025",
-                    "Hito": "Oficio de Dir Transito a DIPRESEH",
-                    "Category": "RESALTOS",
-                },
-                {
-                    "Tarea": "Instalación de paradero en Av. Santa María",
-                    "Propietario": "Ana Gomez",
-                    "Estado": "En curso",
-                    "Fecha de inicio": "15/04/2024",
-                    "Fecha de finalización": "30/06/2024",
-                    "Hito": "Coordinación con empresa constructora",
-                    "Category": "paraderos provisorios",
-                },
-                {
-                    "Tarea": "Diseño de nuevo parque central",
-                    "Propietario": "Carlos Diaz",
-                    "Estado": "No iniciada",
-                    "Fecha de inicio": "01/07/2024",
-                    "Fecha de finalización": "31/12/2024",
-                    "Hito": "Licitación de diseño arquitectónico",
-                    "Category": "Proyectos",
-                },
-                {
-                    "Tarea": "Demarcación de ciclovías en centro histórico",
-                    "Propietario": "Luis Contreras",
-                    "Estado": "En curso",
-                    "Fecha de inicio": "10/05/2024",
-                    "Fecha de finalización": "15/07/2024",
-                    "Hito": "Compra de pintura y materiales",
-                    "Category": "Demarcaciones",
-                },
-                {
-                    "Tarea": "Evaluación de cierre de pasaje Los Aromos",
-                    "Propietario": "Sofia Vega",
-                    "Estado": "Completada",
-                    "Fecha de inicio": "01/02/2024",
-                    "Fecha de finalización": "28/02/2024",
-                    "Hito": "Informe de impacto vial entregado",
-                    "Category": "Cierre de Pasajes",
-                },
-                {
-                    "Tarea": "Revisión de señales de tránsito en Av. Principal",
-                    "Propietario": "Juan Torres",
-                    "Estado": "En curso",
-                    "Fecha de inicio": "01/06/2024",
-                    "Fecha de finalización": "30/06/2024",
-                    "Hito": "Catastro de señales existentes",
-                    "Category": "Señales Transitorias",
-                },
-                {
-                    "Tarea": "Actualización de semáforos SCAT",
-                    "Propietario": "Luis Contreras",
-                    "Estado": "No iniciada",
-                    "Fecha de inicio": "01/08/2024",
-                    "Fecha de finalización": "30/11/2024",
-                    "Hito": "Definir presupuesto para actualización",
-                    "Category": "SCAT",
-                },
-                {
-                    "Tarea": "Estudio de estacionamientos reservados para discapacitados",
-                    "Propietario": "Maria Lopez",
-                    "Estado": "Completada",
-                    "Fecha de inicio": "15/03/2024",
-                    "Fecha de finalización": "30/04/2024",
-                    "Hito": "Propuesta enviada a concejo municipal",
-                    "Category": "Estacionamientos Reservados",
-                },
-            ]
-            for item in excel_data:
-                try:
-                    start_date = datetime.datetime.strptime(
-                        item["Fecha de inicio"], "%d/%m/%Y"
-                    ).date()
-                    due_date = (
-                        datetime.datetime.strptime(
-                            item["Fecha de finalización"],
-                            "%d/%m/%Y",
-                        ).date()
-                        if item["Fecha de finalización"]
-                        else None
-                    )
-                    status_map = {
-                        "Completada": "finalizado",
-                        "En curso": "ejecución",
-                        "No iniciada": "no iniciada",
-                    }
-                    project_status = status_map.get(
-                        item["Estado"], "idea"
-                    )
-                    category_id = (
-                        category_map[item["Category"]].id
-                        if item["Category"] in category_map
-                        else None
-                    )
-                    project = DBProject(
-                        name=item["Tarea"],
-                        responsible=item["Propietario"],
-                        start_date=start_date,
-                        due_date=due_date,
-                        status=project_status,
-                        category_id=category_id,
-                    )
-                    session.add(project)
-                    session.flush()
-                    task_status = (
-                        "hecho"
-                        if project_status == "finalizado"
-                        else "por hacer"
-                    )
-                    task = DBTask(
-                        project_id=project.id,
-                        description=item["Hito"],
-                        due_date=due_date,
-                        status=task_status,
-                        priority="media",
-                    )
-                    session.add(task)
-                    session.commit()
-                except Exception as e:
-                    session.rollback()
-                    print(
-                        f"Could not add item {item['Tarea']}: {e}"
-                    )
             self._initial_data_populated = True
-            self.last_updated_timestamp = time.time()
             print(
-                "Initial project data from excel populated into database."
+                "Initial project data populated into database."
             )
-
-    @rx.event
-    def force_update(self):
-        self.last_updated_timestamp = time.time()
-
-    @rx.event
-    async def on_load(self) -> None:
-        yield ProjectState.force_update
 
     @rx.event
     async def load_project_for_detail_page(self):
@@ -276,30 +197,15 @@ class ProjectState(rx.State):
             "project_id", ""
         )
         if project_id_str.isdigit():
-            project_id = int(project_id_str)
-            with rx.session() as session:
-                project_db = session.get(
-                    DBProject, project_id
-                )
-                if project_db:
-                    self.selected_project_id = project_id
-                else:
-                    self.selected_project_id = None
-                    yield rx.toast(
-                        "Proyecto no encontrado.",
-                        duration=3000,
-                        position="top-center",
-                    )
-                    yield rx.redirect("/proyectos")
+            self.select_project(int(project_id_str))
         else:
-            self.selected_project_id = None
+            self.select_project(None)
             yield rx.toast(
                 "ID de proyecto inválido.",
                 duration=3000,
                 position="top-center",
             )
             yield rx.redirect("/proyectos")
-        yield ProjectState.force_update
 
     async def _add_log_entry_db(
         self,
@@ -326,11 +232,6 @@ class ProjectState(rx.State):
     def _map_dbproject_to_projecttype(
         self, db_project: DBProject
     ) -> ProjectType:
-        due_date_str = (
-            db_project.due_date.strftime("%Y-%m-%d")
-            if db_project.due_date
-            else None
-        )
         return {
             "id": db_project.id,
             "name": db_project.name,
@@ -338,33 +239,25 @@ class ProjectState(rx.State):
             "start_date": db_project.start_date.strftime(
                 "%Y-%m-%d"
             ),
-            "due_date": due_date_str,
+            "due_date": db_project.due_date.strftime(
+                "%Y-%m-%d"
+            ),
             "status": cast(StatusType, db_project.status),
-            "description": db_project.description,
+            "description": db_project.description or "",
             "is_overdue": self.is_date_overdue(
-                due_date_str
+                db_project.due_date.strftime("%Y-%m-%d")
             ),
             "is_due_soon": self.is_date_due_soon(
-                due_date_str, days_threshold=7
-            ),
-            "category_id": db_project.category_id,
-            "category_name": (
-                db_project.category.name
-                if db_project.category
-                else "Sin Categoría"
+                db_project.due_date.strftime("%Y-%m-%d"),
+                days_threshold=7,
             ),
         }
 
     def _map_dbtask_to_tasktype(
         self, db_task: DBTask
     ) -> TaskType:
-        due_date_str = (
-            db_task.due_date.strftime("%Y-%m-%d")
-            if db_task.due_date
-            else None
-        )
+        due_date_str = db_task.due_date.strftime("%Y-%m-%d")
         status_str = cast(StatusType, db_task.status)
-        created_at_str = db_task.created_at.isoformat()
         return {
             "id": db_task.id,
             "project_id": db_task.project_id,
@@ -380,10 +273,6 @@ class ProjectState(rx.State):
                 due_date_str, days_threshold=7
             )
             and status_str != "hecho",
-            "created_at": created_at_str,
-            "formatted_created_at": self.format_timestamp(
-                created_at_str
-            ),
         }
 
     def _map_dblogentry_to_logentrytype(
@@ -401,8 +290,9 @@ class ProjectState(rx.State):
         }
 
     @rx.var
-    def filtered_project_list(self) -> list[ProjectType]:
-        _ = self.last_updated_timestamp
+    def project_list(self) -> list[ProjectType]:
+        if not self._initial_data_populated:
+            return []
         with rx.session() as session:
             query = sqlalchemy.select(DBProject)
             if self.filter_status != "todos":
@@ -420,7 +310,7 @@ class ProjectState(rx.State):
                         DBProject.due_date
                         <= filter_date_obj
                     )
-                except (ValueError, TypeError):
+                except ValueError:
                     pass
             if self.filter_responsible:
                 query = query.where(
@@ -428,29 +318,8 @@ class ProjectState(rx.State):
                         f"%{self.filter_responsible}%"
                     )
                 )
-            if self.search_term.strip():
-                search_lower = self.search_term.lower()
-                query = query.where(
-                    sqlalchemy.or_(
-                        DBProject.name.ilike(
-                            f"%{search_lower}%"
-                        ),
-                        DBProject.responsible.ilike(
-                            f"%{search_lower}%"
-                        ),
-                        DBProject.description.ilike(
-                            f"%{search_lower}%"
-                        ),
-                    )
-                )
             db_projects = (
-                session.exec(
-                    query.options(
-                        sqlalchemy.orm.joinedload(
-                            DBProject.category
-                        )
-                    ).order_by(DBProject.name)
-                )
+                session.exec(query.order_by(DBProject.name))
                 .scalars()
                 .all()
             )
@@ -460,8 +329,31 @@ class ProjectState(rx.State):
             ]
 
     @rx.var
+    def filtered_project_list(self) -> list[ProjectType]:
+        projects_from_db = self.project_list
+        if not self.search_term.strip():
+            return projects_from_db
+        search_lower = self.search_term.lower()
+        filtered_list = []
+        for p in projects_from_db:
+            name_match = search_lower in p["name"].lower()
+            responsible_match = (
+                search_lower in p["responsible"].lower()
+            )
+            description_match = (
+                search_lower
+                in p.get("description", "").lower()
+            )
+            if (
+                name_match
+                or responsible_match
+                or description_match
+            ):
+                filtered_list.append(p)
+        return filtered_list
+
+    @rx.var
     def selected_project(self) -> ProjectType | None:
-        _ = self.last_updated_timestamp
         if self.selected_project_id is None:
             return None
         with rx.session() as session:
@@ -478,7 +370,6 @@ class ProjectState(rx.State):
 
     @rx.var
     def tasks_for_selected_project(self) -> list[TaskType]:
-        _ = self.last_updated_timestamp
         if self.selected_project_id is None:
             return []
         with rx.session() as session:
@@ -500,7 +391,7 @@ class ProjectState(rx.State):
                 mapped_tasks,
                 key=lambda t: (
                     VALID_PRIORITIES.index(t["priority"]),
-                    t["due_date"] or "9999-12-31",
+                    t["due_date"],
                 ),
             )
 
@@ -508,7 +399,6 @@ class ProjectState(rx.State):
     def logs_for_selected_project(
         self,
     ) -> list[LogEntryType]:
-        _ = self.last_updated_timestamp
         if self.selected_project_id is None:
             return []
         with rx.session() as session:
@@ -531,7 +421,8 @@ class ProjectState(rx.State):
 
     @rx.var
     def all_log_entries(self) -> list[LogEntryType]:
-        _ = self.last_updated_timestamp
+        if not self._initial_data_populated:
+            return []
         with rx.session() as session:
             db_logs = (
                 session.exec(
@@ -549,13 +440,13 @@ class ProjectState(rx.State):
 
     @rx.var
     def recent_log_entries(self) -> list[LogEntryType]:
-        _ = self.last_updated_timestamp
         all_entries = self.all_log_entries
         return all_entries[:10]
 
     @rx.var
     def filtered_log_entries(self) -> list[LogEntryType]:
-        _ = self.last_updated_timestamp
+        if not self._initial_data_populated:
+            return []
         logs_query = sqlalchemy.select(DBLogEntry)
         if self.filter_log_project_status != "todos":
             project_ids_with_status = sqlalchemy.select(
@@ -639,52 +530,41 @@ class ProjectState(rx.State):
         due_date_str = form_data.get("due_date", "")
         status_str = form_data.get("status", "idea")
         description_str = form_data.get("description", "")
-        category_id_str = form_data.get("category_id", "")
         if not all(
-            [name, responsible, start_date_str, status_str]
+            [
+                name,
+                responsible,
+                start_date_str,
+                due_date_str,
+                status_str,
+            ]
         ):
-            yield rx.toast(
-                "Nombre, responsable, fecha de inicio y estado del proyecto son obligatorios.",
+            return rx.toast(
+                "Nombre, responsable, fechas y estado del proyecto son obligatorios.",
                 duration=3000,
             )
-            return
         try:
             start_date_obj = datetime.datetime.strptime(
                 start_date_str, "%Y-%m-%d"
             ).date()
-            due_date_obj = (
-                datetime.datetime.strptime(
-                    due_date_str, "%Y-%m-%d"
-                ).date()
-                if due_date_str
-                else None
-            )
-            if (
-                due_date_obj
-                and start_date_obj > due_date_obj
-            ):
-                yield rx.toast(
+            due_date_obj = datetime.datetime.strptime(
+                due_date_str, "%Y-%m-%d"
+            ).date()
+            if start_date_obj > due_date_obj:
+                return rx.toast(
                     "La fecha de inicio no puede ser posterior a la fecha límite.",
                     duration=3000,
                 )
-                return
         except ValueError:
-            yield rx.toast(
+            return rx.toast(
                 "Formato de fecha inválido. Use YYYY-MM-DD.",
                 duration=3000,
             )
-            return
-        category_id = (
-            int(category_id_str)
-            if category_id_str and category_id_str.isdigit()
-            else None
-        )
         if status_str not in VALID_PROJECT_STATUSES:
-            yield rx.toast(
+            return rx.toast(
                 f"Estado de proyecto inválido.",
                 duration=3000,
             )
-            return
         project_action = "actualizado"
         saved_project_id: int | None = None
         with rx.session() as session:
@@ -693,11 +573,10 @@ class ProjectState(rx.State):
                     DBProject, self.editing_project_id
                 )
                 if not db_project:
-                    yield rx.toast(
+                    return rx.toast(
                         "Proyecto no encontrado para editar.",
                         duration=3000,
                     )
-                    return
                 saved_project_id = self.editing_project_id
             else:
                 db_project = DBProject()
@@ -708,7 +587,6 @@ class ProjectState(rx.State):
             db_project.due_date = due_date_obj
             db_project.status = status_str
             db_project.description = description_str
-            db_project.category_id = category_id
             session.add(db_project)
             session.flush()
             if saved_project_id is None:
@@ -727,20 +605,16 @@ class ProjectState(rx.State):
                 and (project_action == "creado")
             ):
                 new_task_due_date_str = form_data.get(
-                    "new_task_due_date"
+                    "new_task_due_date", due_date_str
                 )
-                new_task_due_obj = None
-                if new_task_due_date_str:
-                    try:
-                        new_task_due_obj = (
-                            datetime.datetime.strptime(
-                                new_task_due_date_str,
-                                "%Y-%m-%d",
-                            ).date()
-                        )
-                    except ValueError:
-                        pass
-                else:
+                try:
+                    new_task_due_obj = (
+                        datetime.datetime.strptime(
+                            new_task_due_date_str,
+                            "%Y-%m-%d",
+                        ).date()
+                    )
+                except ValueError:
                     new_task_due_obj = due_date_obj
                 db_task = DBTask(
                     project_id=saved_project_id,
@@ -758,8 +632,7 @@ class ProjectState(rx.State):
             session.commit()
         self.show_project_form_dialog = False
         self.editing_project_id = None
-        yield ProjectState.force_update
-        yield rx.toast(
+        return rx.toast(
             f"Proyecto '{name}' {project_action} exitosamente.",
             duration=3000,
         )
@@ -803,7 +676,6 @@ class ProjectState(rx.State):
                 if self.selected_project_id == project_id:
                     self.selected_project_id = None
                     yield rx.redirect("/proyectos")
-                yield ProjectState.force_update
                 yield rx.toast(
                     f"Proyecto '{project_name}' eliminado.",
                     duration=3000,
@@ -856,15 +728,13 @@ class ProjectState(rx.State):
         priority_str = form_data.get("priority", "media")
         status_str = form_data.get("status", "por hacer")
         if priority_str not in VALID_PRIORITIES:
-            yield rx.toast(
+            return rx.toast(
                 f"Prioridad inválida.", duration=3000
             )
-            return
         if status_str not in VALID_STATUSES:
-            yield rx.toast(
+            return rx.toast(
                 f"Estado de tarea inválido.", duration=3000
             )
-            return
         current_project_id_for_task: int | None = None
         if self.editing_task_id is not None:
             with rx.session() as session:
@@ -876,41 +746,33 @@ class ProjectState(rx.State):
                         task_db.project_id
                     )
                 else:
-                    yield rx.toast(
+                    return rx.toast(
                         "Tarea para editar no encontrada.",
                         duration=3000,
                     )
-                    return
         else:
             current_project_id_for_task = (
                 self.selected_project_id
             )
         if current_project_id_for_task is None:
-            yield rx.toast(
+            return rx.toast(
                 "No hay contexto de proyecto para esta tarea. Seleccione un proyecto.",
                 duration=3000,
             )
-            return
-        if not description:
-            yield rx.toast(
-                "La descripción de la tarea es obligatoria.",
+        if not all([description, due_date_str]):
+            return rx.toast(
+                "La descripción y la fecha límite de la tarea son obligatorias.",
                 duration=3000,
             )
-            return
         try:
-            due_date_obj = (
-                datetime.datetime.strptime(
-                    due_date_str, "%Y-%m-%d"
-                ).date()
-                if due_date_str
-                else None
-            )
+            due_date_obj = datetime.datetime.strptime(
+                due_date_str, "%Y-%m-%d"
+            ).date()
         except ValueError:
-            yield rx.toast(
+            return rx.toast(
                 "Formato de fecha inválido para la tarea. Use YYYY-MM-DD.",
                 duration=3000,
             )
-            return
         task_action = "actualizada"
         with rx.session() as session:
             if self.editing_task_id is not None:
@@ -918,11 +780,10 @@ class ProjectState(rx.State):
                     DBTask, self.editing_task_id
                 )
                 if not db_task:
-                    yield rx.toast(
+                    return rx.toast(
                         "Tarea no encontrada para editar.",
                         duration=3000,
                     )
-                    return
             else:
                 db_task = DBTask(
                     project_id=current_project_id_for_task
@@ -941,8 +802,7 @@ class ProjectState(rx.State):
             session.commit()
         self.show_task_form_dialog = False
         self.editing_task_id = None
-        yield ProjectState.force_update
-        yield rx.toast(
+        return rx.toast(
             f"Tarea '{description}' {task_action} exitosamente.",
             duration=3000,
         )
@@ -961,13 +821,12 @@ class ProjectState(rx.State):
                     project_id=project_id_for_log,
                 )
                 session.commit()
-                yield ProjectState.force_update
-                yield rx.toast(
+                return rx.toast(
                     f"Tarea '{task_description}' eliminada.",
                     duration=3000,
                 )
             else:
-                yield rx.toast(
+                return rx.toast(
                     "Tarea no encontrada para eliminar.",
                     duration=3000,
                 )
@@ -977,10 +836,9 @@ class ProjectState(rx.State):
         self, task_id: int, new_status_str: str
     ):
         if new_status_str not in VALID_STATUSES:
-            yield rx.toast(
+            return rx.toast(
                 f"Estado de tarea inválido.", duration=3000
             )
-            return
         new_status = cast(StatusType, new_status_str)
         with rx.session() as session:
             db_task = session.get(DBTask, task_id)
@@ -994,8 +852,7 @@ class ProjectState(rx.State):
                     project_id=db_task.project_id,
                 )
                 session.commit()
-                yield ProjectState.force_update
-                yield rx.toast(
+                return rx.toast(
                     f"Estado de tarea '{db_task.description}' actualizado.",
                     duration=3000,
                 )
@@ -1015,17 +872,15 @@ class ProjectState(rx.State):
     async def add_manual_log_entry(self, form_data: dict):
         action = form_data.get("action", "").strip()
         if not self.selected_project_id:
-            yield rx.toast(
+            return rx.toast(
                 "Ningún proyecto seleccionado.",
                 duration=3000,
             )
-            return
         if not action:
-            yield rx.toast(
+            return rx.toast(
                 "La acción de la bitácora no puede estar vacía.",
                 duration=3000,
             )
-            return
         with rx.session() as session:
             await self._add_log_entry_db(
                 session,
@@ -1034,16 +889,13 @@ class ProjectState(rx.State):
             )
             session.commit()
         self.show_log_form_dialog = False
-        yield ProjectState.force_update
-        yield rx.toast(
+        return rx.toast(
             "Entrada manual de bitácora añadida.",
             duration=3000,
         )
 
     def is_date_due_soon(
-        self,
-        due_date_str: str | None,
-        days_threshold: int = 7,
+        self, due_date_str: str, days_threshold: int = 7
     ) -> bool:
         if not due_date_str:
             return False
@@ -1058,12 +910,10 @@ class ProjectState(rx.State):
                 <= today
                 + datetime.timedelta(days=days_threshold)
             )
-        except (ValueError, TypeError):
+        except ValueError:
             return False
 
-    def is_date_overdue(
-        self, due_date_str: str | None
-    ) -> bool:
+    def is_date_overdue(self, due_date_str: str) -> bool:
         if not due_date_str:
             return False
         try:
@@ -1072,7 +922,7 @@ class ProjectState(rx.State):
             ).date()
             today = datetime.date.today()
             return due_date < today
-        except (ValueError, TypeError):
+        except ValueError:
             return False
 
     def format_timestamp(self, timestamp_str: str) -> str:
@@ -1084,15 +934,19 @@ class ProjectState(rx.State):
         except (ValueError, TypeError):
             return "Fecha Inválida"
 
+    @rx.event
     def set_search_term(self, term: str):
         self.search_term = term.strip()
 
+    @rx.event
     def set_filter_status(self, status: str):
         self.filter_status = status
 
+    @rx.event
     def set_filter_due_date(self, date: str):
         self.filter_due_date = date
 
+    @rx.event
     def set_filter_responsible(self, responsible: str):
         self.filter_responsible = responsible.strip()
 
@@ -1103,9 +957,11 @@ class ProjectState(rx.State):
         self.filter_responsible = ""
         self.search_term = ""
 
+    @rx.event
     def set_filter_log_project_status(self, status: str):
         self.filter_log_project_status = status
 
+    @rx.event
     def set_filter_log_action_text(self, text: str):
         self.filter_log_action_text = text.strip()
 
@@ -1114,18 +970,11 @@ class ProjectState(rx.State):
         self.filter_log_project_status = "todos"
         self.filter_log_action_text = ""
 
-    @rx.event
-    def filter_by_status_and_redirect(self, status: str):
-        self.filter_status = status
-        self.search_term = ""
-        self.filter_due_date = ""
-        self.filter_responsible = ""
-        return rx.redirect("/proyectos")
-
     def _get_project_count_by_status(
         self, status: StatusType
     ) -> int:
-        _ = self.last_updated_timestamp
+        if not self._initial_data_populated:
+            return 0
         with rx.session() as session:
             return (
                 session.exec(
@@ -1137,80 +986,9 @@ class ProjectState(rx.State):
             )
 
     @rx.var
-    def all_project_categories(
-        self,
-    ) -> list[ProjectCategory]:
-        _ = self.last_updated_timestamp
-        with rx.session() as session:
-            db_categories = (
-                session.exec(
-                    sqlalchemy.select(
-                        DBProjectCategory
-                    ).order_by(DBProjectCategory.name)
-                )
-                .scalars()
-                .all()
-            )
-            return [
-                {"id": cat.id, "name": cat.name}
-                for cat in db_categories
-            ]
-
-    @rx.var
-    def all_tasks(self) -> list[TaskType]:
-        _ = self.last_updated_timestamp
-        with rx.session() as session:
-            db_tasks = (
-                session.exec(sqlalchemy.select(DBTask))
-                .scalars()
-                .all()
-            )
-            return [
-                self._map_dbtask_to_tasktype(t)
-                for t in db_tasks
-            ]
-
-    @rx.var
-    def total_tasks_count(self) -> int:
-        _ = self.last_updated_timestamp
-        return len(self.all_tasks)
-
-    @rx.var
-    def tasks_por_hacer_count(self) -> int:
-        _ = self.last_updated_timestamp
-        return len(
-            [
-                t
-                for t in self.all_tasks
-                if t["status"] == "por hacer"
-            ]
-        )
-
-    @rx.var
-    def tasks_en_progreso_count(self) -> int:
-        _ = self.last_updated_timestamp
-        return len(
-            [
-                t
-                for t in self.all_tasks
-                if t["status"] == "en progreso"
-            ]
-        )
-
-    @rx.var
-    def tasks_hecho_count(self) -> int:
-        _ = self.last_updated_timestamp
-        return len(
-            [
-                t
-                for t in self.all_tasks
-                if t["status"] == "hecho"
-            ]
-        )
-
-    @rx.var
     def total_projects_count(self) -> int:
-        _ = self.last_updated_timestamp
+        if not self._initial_data_populated:
+            return 0
         with rx.session() as session:
             return (
                 session.exec(
@@ -1242,14 +1020,9 @@ class ProjectState(rx.State):
         )
 
     @rx.var
-    def projects_no_iniciada_count(self) -> int:
-        return self._get_project_count_by_status(
-            "no iniciada"
-        )
-
-    @rx.var
     def projects_due_soon_count(self) -> int:
-        _ = self.last_updated_timestamp
+        if not self._initial_data_populated:
+            return 0
         with rx.session() as session:
             today = datetime.date.today()
             due_soon_threshold = today + datetime.timedelta(
@@ -1260,7 +1033,6 @@ class ProjectState(rx.State):
                     sqlalchemy.select(
                         sqlalchemy.func.count(DBProject.id)
                     )
-                    .where(DBProject.due_date != None)
                     .where(DBProject.due_date >= today)
                     .where(
                         DBProject.due_date
@@ -1273,7 +1045,8 @@ class ProjectState(rx.State):
 
     @rx.var
     def projects_overdue_count(self) -> int:
-        _ = self.last_updated_timestamp
+        if not self._initial_data_populated:
+            return 0
         with rx.session() as session:
             today = datetime.date.today()
             return (
@@ -1281,7 +1054,6 @@ class ProjectState(rx.State):
                     sqlalchemy.select(
                         sqlalchemy.func.count(DBProject.id)
                     )
-                    .where(DBProject.due_date != None)
                     .where(DBProject.due_date < today)
                     .where(DBProject.status != "finalizado")
                 ).scalar_one_or_none()
@@ -1292,26 +1064,18 @@ class ProjectState(rx.State):
     def project_status_distribution(
         self,
     ) -> list[dict[str, str | int]]:
-        _ = self.last_updated_timestamp
-        colors = {
-            "idea": "#3B82F6",
-            "diseño": "#8B5CF6",
-            "ejecución": "#FBBF24",
-            "finalizado": "#10B981",
-            "no iniciada": "#6B7280",
-        }
+        if not self._initial_data_populated:
+            return []
         counts = {
             "idea": self.projects_idea_count,
             "diseño": self.projects_diseno_count,
             "ejecución": self.projects_ejecucion_count,
             "finalizado": self.projects_finalizado_count,
-            "no iniciada": self.projects_no_iniciada_count,
         }
         return [
             {
                 "name": status.capitalize(),
                 "value": count_val,
-                "fill": colors.get(status, "#A0AEC0"),
             }
             for status, count_val in counts.items()
             if count_val > 0
@@ -1321,7 +1085,8 @@ class ProjectState(rx.State):
     def projects_by_responsible_data(
         self,
     ) -> list[dict[str, Union[str, int]]]:
-        _ = self.last_updated_timestamp
+        if not self._initial_data_populated:
+            return []
         with rx.session() as session:
             results = session.exec(
                 sqlalchemy.select(
@@ -1352,7 +1117,8 @@ class ProjectState(rx.State):
     def projects_by_status_dashboard_data(
         self,
     ) -> list[dict[str, Union[str, int]]]:
-        _ = self.last_updated_timestamp
+        if not self._initial_data_populated:
+            return []
         query = sqlalchemy.select(
             DBProject.status,
             sqlalchemy.func.count(DBProject.id).label(
@@ -1415,28 +1181,3 @@ class ProjectState(rx.State):
                     }
                 )
         return data_to_return
-
-    @rx.var
-    def task_status_distribution(
-        self,
-    ) -> list[dict[str, str | int]]:
-        _ = self.last_updated_timestamp
-        colors = {
-            "por hacer": "#A0AEC0",
-            "en progreso": "#ECC94B",
-            "hecho": "#48BB78",
-        }
-        counts = {
-            "por hacer": self.tasks_por_hacer_count,
-            "en progreso": self.tasks_en_progreso_count,
-            "hecho": self.tasks_hecho_count,
-        }
-        return [
-            {
-                "name": status.capitalize(),
-                "value": data_count,
-                "fill": colors.get(status, "#A0AEC0"),
-            }
-            for status, data_count in counts.items()
-            if data_count > 0
-        ]

@@ -19,12 +19,6 @@ def project_card(project: ProjectType) -> rx.Component:
     )
     return rx.el.div(
         rx.el.div(
-            rx.el.div(
-                rx.el.span(
-                    project["category_name"],
-                    class_name="text-xs font-semibold px-2 py-1 bg-gray-200 text-gray-800 rounded-full mb-2 inline-block",
-                )
-            ),
             rx.el.h3(
                 project["name"],
                 class_name="text-lg font-semibold text-indigo-700 truncate",
@@ -58,7 +52,7 @@ def project_card(project: ProjectType) -> rx.Component:
             ),
             class_name="flex-grow cursor-pointer p-4",
             on_click=lambda: rx.redirect(
-                f"/proyectos/{project['id']}"
+                "/proyectos/" + str(project["id"])
             ),
         ),
         rx.el.div(

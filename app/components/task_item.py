@@ -35,10 +35,6 @@ def task_item(task: TaskType) -> rx.Component:
                     f"Vence: {task['due_date']}",
                     class_name="text-xs text-gray-500 mt-1",
                 ),
-                rx.el.p(
-                    f"Creado: {task['formatted_created_at']}",
-                    class_name="text-xs text-gray-400 mt-0.5",
-                ),
                 rx.cond(
                     task["is_overdue"],
                     rx.el.span(

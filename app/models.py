@@ -1,11 +1,5 @@
 from typing import Literal, TypedDict
 
-
-class ProjectCategory(TypedDict):
-    id: int
-    name: str
-
-
 StatusType = Literal[
     "por hacer",
     "en progreso",
@@ -14,7 +8,6 @@ StatusType = Literal[
     "diseño",
     "ejecución",
     "finalizado",
-    "no iniciada",
 ]
 PriorityType = Literal["crítica", "alta", "media", "baja"]
 VALID_PRIORITIES: list[PriorityType] = [
@@ -33,7 +26,6 @@ VALID_PROJECT_STATUSES: list[StatusType] = [
     "diseño",
     "ejecución",
     "finalizado",
-    "no iniciada",
 ]
 
 
@@ -41,13 +33,11 @@ class Task(TypedDict):
     id: int
     project_id: int
     description: str
-    due_date: str | None
+    due_date: str
     status: StatusType
     priority: PriorityType
     is_overdue: bool
     is_due_soon: bool
-    created_at: str
-    formatted_created_at: str
 
 
 class LogEntry(TypedDict):
@@ -64,13 +54,11 @@ class Project(TypedDict):
     name: str
     responsible: str
     start_date: str
-    due_date: str | None
+    due_date: str
     status: StatusType
-    description: str | None
+    description: str
     is_overdue: bool
     is_due_soon: bool
-    category_id: int | None
-    category_name: str | None
 
 
 class User(TypedDict):

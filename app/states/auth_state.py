@@ -11,6 +11,7 @@ import json
 class AuthState(rx.State):
     error_message: str = ""
     is_logged_in: bool = False
+    is_loading: bool = True
     current_user_id: int | None = None
     current_user_display_name: str = ""
     current_user_roles: list[str] = []
@@ -29,14 +30,14 @@ class AuthState(rx.State):
     new_password_input: str = ""
     confirm_new_password_input: str = ""
     _initial_admin_created: bool = False
-    sidebar_open: bool = False
+    all_users: list[UserType] = []
 
     @rx.event
-    def toggle_sidebar(self):
-        self.sidebar_open = not self.sidebar_open
+    async def finish_loading(self):
+        self.is_loading = False
 
     @rx.event
-    def on_load_create_admin_if_not_exists(self):
+    async def on_load_create_admin_if_not_exists(self):
         if self._initial_admin_created:
             return
         with rx.session() as session:
@@ -162,7 +163,7 @@ class AuthState(rx.State):
         return rx.redirect("/")
 
     @rx.event
-    def check_login_status(self):
+    async def check_login_status(self):
         if not self.is_logged_in:
             return rx.redirect("/")
         return None
@@ -275,6 +276,19 @@ class AuthState(rx.State):
             new_db_user.roles = roles_list
             session.add(new_db_user)
             session.commit()
+            session.refresh(new_db_user)
+            self.all_users.append(
+                {
+                    "id": new_db_user.id,
+                    "username": new_db_user.username,
+                    "password": "",
+                    "roles": new_db_user.roles,
+                    "email": new_db_user.email,
+                    "phone": new_db_user.phone,
+                    "contact_info": new_db_user.contact_info,
+                    "temp_password": new_db_user.temp_password,
+                }
+            )
         self.new_user_generated_password = (
             f"Contraseña Temporal: {generated_password}"
         )
@@ -304,49 +318,55 @@ class AuthState(rx.State):
             return
         return
 
-    @rx.var
-    def filtered_users(self) -> list[UserType]:
+    @rx.event
+    def load_users(self):
+        """Load users from the database."""
         with rx.session() as session:
-            query = sqlalchemy.select(DBUser)
-            current_filter_username_val = (
-                self.filter_user_username
-            )
-            current_filter_role_val = self.filter_user_role
-            if current_filter_username_val:
-                query = query.where(
-                    DBUser.username.ilike(
-                        f"%{current_filter_username_val}%"
-                    )
-                )
-            db_users_result = (
+            db_users = (
                 session.exec(
-                    query.order_by(DBUser.username)
+                    sqlalchemy.select(DBUser).order_by(
+                        DBUser.username
+                    )
                 )
                 .scalars()
                 .all()
             )
-            processed_users: list[UserType] = []
-            for db_user in db_users_result:
-                user_roles = db_user.roles
+            self.all_users = [
+                {
+                    "id": db_user.id,
+                    "username": db_user.username,
+                    "password": "",
+                    "roles": db_user.roles,
+                    "email": db_user.email,
+                    "phone": db_user.phone,
+                    "contact_info": db_user.contact_info,
+                    "temp_password": db_user.temp_password,
+                }
+                for db_user in db_users
+            ]
+
+    @rx.var
+    def filtered_users(self) -> list[UserType]:
+        users_to_filter = self.all_users
+        filtered_users_list = []
+        for user in users_to_filter:
+            username_match = True
+            if self.filter_user_username:
                 if (
-                    current_filter_role_val != "todos"
-                    and current_filter_role_val
-                    not in user_roles
+                    self.filter_user_username.lower()
+                    not in user["username"].lower()
                 ):
-                    continue
-                processed_users.append(
-                    {
-                        "id": db_user.id,
-                        "username": db_user.username,
-                        "password": "",
-                        "roles": user_roles,
-                        "email": db_user.email,
-                        "phone": db_user.phone,
-                        "contact_info": db_user.contact_info,
-                        "temp_password": db_user.temp_password,
-                    }
-                )
-            return processed_users
+                    username_match = False
+            role_match = True
+            if self.filter_user_role != "todos":
+                if (
+                    self.filter_user_role
+                    not in user["roles"]
+                ):
+                    role_match = False
+            if username_match and role_match:
+                filtered_users_list.append(user)
+        return filtered_users_list
 
     def set_filter_user_username(self, username: str):
         self.filter_user_username = username.strip()
