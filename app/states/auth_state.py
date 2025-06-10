@@ -38,7 +38,6 @@ class AuthState(rx.State):
 
     @rx.event
     async def on_load_create_admin_if_not_exists(self):
-        rx.Model.create_all()
         if self._initial_admin_created:
             return
         with rx.session() as session:

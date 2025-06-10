@@ -10,11 +10,18 @@ from app.pages.admin_page import admin_page
 from app.pages.ayuda_page import ayuda_page
 from app.states.auth_state import AuthState
 from app.states.project_state import ProjectState
+from app.db_models import (
+    DBUser,
+    DBProject,
+    DBTask,
+    DBLogEntry,
+)
 
 
 @rx.event
 async def initial_load_event():
     """Initial load event to set up the database and initial data."""
+    rx.Model.create_all()
     auth_state = await AuthState.get_state()
     await auth_state.on_load_create_admin_if_not_exists()
     project_state = await ProjectState.get_state()
