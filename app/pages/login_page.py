@@ -37,13 +37,32 @@ def login_page() -> rx.Component:
                             html_for="login_password",
                             class_name="block text-sm font-medium text-gray-700 mb-1",
                         ),
-                        rx.el.input(
-                            name="password",
-                            id="login_password",
-                            type="password",
-                            placeholder="Contraseña",
-                            class_name="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500",
-                            required=True,
+                        rx.el.div(
+                            rx.el.input(
+                                name="password",
+                                id="login_password",
+                                type_=rx.cond(
+                                    AuthState.show_login_password,
+                                    "text",
+                                    "password",
+                                ),
+                                placeholder="Contraseña",
+                                class_name="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500",
+                                required=True,
+                            ),
+                            rx.el.button(
+                                rx.el.i(
+                                    class_name=rx.cond(
+                                        AuthState.show_login_password,
+                                        "fas fa-eye-slash",
+                                        "fas fa-eye",
+                                    )
+                                ),
+                                on_click=AuthState.toggle_show_login_password,
+                                type_="button",
+                                class_name="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700",
+                            ),
+                            class_name="relative",
                         ),
                         class_name="mb-6",
                     ),
@@ -72,7 +91,7 @@ def login_page() -> rx.Component:
                 rx.el.image(
                     src="/professional_logo_ilustre.png",
                     alt="Logo Municipalidad de Arica",
-                    class_name="w-40 h-auto md:w-48 object-contain mx-auto",
+                    class_name="w-48 h-auto md:w-60 object-contain mx-auto",
                 ),
                 rx.el.p(
                     "Ilustre Municipalidad de Arica",
@@ -84,7 +103,7 @@ def login_page() -> rx.Component:
                 ),
                 class_name="w-full md:w-1/2 bg-indigo-700 flex flex-col items-center justify-center p-8 rounded-r-lg",
             ),
-            class_name="flex flex-col md:flex-row bg-white rounded-lg shadow-2xl w-full max-w-4xl mx-auto overflow-hidden",
+            class_name="flex flex-col md:flex-row bg-white/80 backdrop-blur-lg rounded-lg shadow-2xl w-full max-w-4xl mx-auto overflow-hidden",
         ),
-        class_name="min-h-screen bg-gray-100 flex items-center justify-center p-4",
+        class_name="min-h-screen bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-700 flex items-center justify-center p-4",
     )
